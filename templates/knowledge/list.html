@@ -22,16 +22,22 @@
                 <form method="GET" action="{{ url_for('my_knowledge') }}">
                     <input type="hidden" name="tab" value="all">
                     <div class="row g-2 mb-2">
-                        <div class="col-md-5">
+                        <div class="col-md-4">
                             <input type="text" name="q" class="form-control" placeholder="Пошук по тексту..." value="{{ request.args.get('q', '') }}">
                         </div>
-                        <div class="col-md-5">
+                        <div class="col-md-4">
                             <input type="text" name="tag" class="form-control" placeholder="Тег" value="{{ request.args.get('tag', '') }}">
                         </div>
                         <div class="col-md-2">
                             <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Знайти</button>
                         </div>
+                        <div class="col-md-2">
+                            <a href="{{ url_for('my_knowledge', tab='all') }}" class="btn btn-outline-secondary w-100">
+                                <i class="bi bi-x-lg"></i> Скинути
+                            </a>
+                        </div>
                     </div>
+                    
                     <div class="row g-2">
                         <div class="col-md-4">
                             <select name="filter_col" class="form-select">
@@ -188,10 +194,10 @@
                     <div class="col-md-3">
                         <input type="text" name="col_q" class="form-control" placeholder="Назва колекції..." value="{{ request.args.get('col_q', '') }}">
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <input type="text" name="col_item_q" class="form-control" placeholder="Містить текст конспекту..." value="{{ request.args.get('col_item_q', '') }}">
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <select name="col_sort" class="form-select" onchange="this.form.submit()">
                             <option value="name_asc" {% if request.args.get('col_sort') == 'name_asc' %}selected{% endif %}>За назвою (А-Я)</option>
                             <option value="name_desc" {% if request.args.get('col_sort') == 'name_desc' %}selected{% endif %}>За назвою (Я-А)</option>
@@ -201,6 +207,11 @@
                     </div>
                     <div class="col-md-2">
                         <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Знайти</button>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{{ url_for('my_knowledge', tab='collections') }}" class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-x-lg"></i> Скинути
+                        </a>
                     </div>
                 </form>
             </div>

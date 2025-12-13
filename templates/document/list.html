@@ -1,98 +1,141 @@
 {% extends "base.html" %}
-{% block title %}Усі документи{% endblock %}
+{% block title %}Бібліотека документів{% endblock %}
 
 {% block content %}
 <h2 class="mb-4">Бібліотека документів</h2>
 
-<div class="card mb-4 shadow-sm">
+<div class="card shadow-sm mb-4 bg-light">
     <div class="card-body">
-        <form method="GET" class="row g-3">
-            <div class="col-md-5">
-                <input type="text" name="q" class="form-control" placeholder="Повнотекстовий пошук…" 
-                       value="{{ request.args.get('q', '') }}">
-            </div>
-            <div class="col-md-3">
-                <input type="text" name="author" class="form-control" placeholder="Автор" 
-                       value="{{ request.args.get('author', '') }}">
-            </div>
-            <div class="col-md-2">
-                <input type="number" name="year_from" class="form-control" placeholder="Рік від" 
-                       value="{{ request.args.get('year_from', '') }}">
-            </div>
-            <div class="col-md-2">
-                <input type="number" name="year_to" class="form-control" placeholder="Рік до" 
-                       value="{{ request.args.get('year_to', '') }}">
-            </div>
-            <div class="col-md-4">
-                <select name="type" class="form-select">
-                    <option value="">Усі типи</option>
-                    <option value="стаття" {% if request.args.get('type')=='стаття' %}selected{% endif %}>Наукова стаття</option>
-                    <option value="звіт" {% if request.args.get('type')=='звіт' %}selected{% endif %}>Аналітичний звіт</option>
-                    <option value="дисертація" {% if request.args.get('type')=='дисертація' %}selected{% endif %}>Дисертація</option>
-                    <option value="книга" {% if request.args.get('type')=='книга' %}selected{% endif %}>Книга</option>
-                    <option value="інше" {% if request.args.get('type')=='інше' %}selected{% endif %}>Інше</option>
-                </select>
-            </div>
-            
-            <div class="col-md-3 d-flex align-items-center">
-                <div class="form-check form-switch">
-                    <input class="form-check-input" type="checkbox" name="show_my" value="1" id="showMyCheck" 
-                           {% if request.args.get('show_my') == '1' %}checked{% endif %}>
-                    <label class="form-check-label" for="showMyCheck">Тільки мої файли</label>
+        <form method="GET" action="{{ url_for('document_list') }}">
+            <div class="row g-2 mb-2">
+                <div class="col-md-6">
+                    <input type="text" name="q" class="form-control" placeholder="Пошук за назвою..." value="{{ request.args.get('q', '') }}">
+                </div>
+                <div class="col-md-4">
+                    <input type="text" name="author" class="form-control" placeholder="Автор" value="{{ request.args.get('author', '') }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Знайти</button>
                 </div>
             </div>
-
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-primary w-100">Знайти</button>
-            </div>
-            <div class="col-md-2">
-                <a href="{{ url_for('document_list') }}" class="btn btn-outline-secondary w-100">Скинути</a>
+            
+            <div class="row g-2 align-items-center">
+                <div class="col-md-2">
+                    <input type="number" name="year_from" class="form-control form-control-sm" placeholder="Рік з..." value="{{ request.args.get('year_from', '') }}">
+                </div>
+                <div class="col-md-2">
+                    <input type="number" name="year_to" class="form-control form-control-sm" placeholder="Рік по..." value="{{ request.args.get('year_to', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <select name="type" class="form-select form-select-sm">
+                        <option value="">-- Всі типи --</option>
+                        <option value="стаття" {% if request.args.get('type') == 'стаття' %}selected{% endif %}>Наукова стаття</option>
+                        <option value="звіт" {% if request.args.get('type') == 'звіт' %}selected{% endif %}>Аналітичний звіт</option>
+                        <option value="дисертація" {% if request.args.get('type') == 'дисертація' %}selected{% endif %}>Дисертація</option>
+                        <option value="книга" {% if request.args.get('type') == 'книга' %}selected{% endif %}>Книга/розділ</option>
+                        <option value="інше" {% if request.args.get('type') == 'інше' %}selected{% endif %}>Інше</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="show_my" value="1" id="showMyCheck" {% if request.args.get('show_my') == '1' %}checked{% endif %}>
+                        <label class="form-check-label small" for="showMyCheck">
+                            Тільки мої завантаження
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-2 text-end">
+                    <a href="{{ url_for('document_list') }}" class="btn btn-sm btn-outline-secondary">Скинути</a>
+                </div>
             </div>
         </form>
     </div>
 </div>
 
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <span class="text-muted">Знайдено документів: {{ documents|length }}</span>
+    <a href="{{ url_for('upload_document') }}" class="btn btn-success">
+        <i class="bi bi-upload"></i> Завантажити новий
+    </a>
+</div>
+
 {% if documents %}
-    <div class="row row-cols-1 row-cols-md-2 g-4">
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
         {% for doc in documents %}
         <div class="col">
-            <div class="card h-100 shadow-sm hover-shadow">
-                <div class="card-body">
-                    <h5 class="card-title">
-                        <a href="{{ url_for('document_detail', doc_id=doc.id) }}" class="text-decoration-none">
-                            {{ doc.title }}
-                        </a>
-                        {% if current_user.is_authenticated and doc.uploaded_by == current_user.id %}
-                            <span class="badge bg-info text-dark ms-2" title="Завантажено вами">Моє</span>
-                        {% endif %}
-                    </h5>
-                    <p class="card-text text-muted mb-2">
-                        <strong>{{ doc.authors }}</strong> 
-                        {% if doc.year %}• {{ doc.year }}{% endif %}
-                    </p>
-                    <p class="card-text">
-                        {{ doc.source|truncate(120) if doc.source else 'Джерело не вказано' }}
-                    </p>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="badge bg-secondary">{{ doc.doc_type }}</span>
-                        <small class="text-muted">{{ doc.uploaded_at.strftime('%d.%m.%Y') }}</small>
+            <div class="card h-100 shadow-sm border-0 hover-shadow transition-card">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-truncate-3">
+                            <a href="{{ url_for('document_detail', doc_id=doc.id) }}" class="text-decoration-none text-dark stretched-link-custom">
+                                {{ doc.title }}
+                            </a>
+                        </h5>
                     </div>
-                </div>
-                <div class="card-footer bg-transparent">
-                    <a href="{{ url_for('download_document', doc_id=doc.id) }}" class="btn btn-sm btn-outline-primary">
-                        Завантажити файл
-                    </a>
+                    
+                    <h6 class="card-subtitle mb-3 text-muted small">{{ doc.authors|truncate(50) }}</h6>
+
+                    <ul class="list-unstyled small mb-4 flex-grow-1">
+                        <li class="mb-1 d-flex justify-content-between">
+                            <span class="text-muted">Рік:</span>
+                            <span class="fw-bold">{{ doc.year if doc.year else '—' }}</span>
+                        </li>
+                        <li class="mb-1 d-flex justify-content-between">
+                            <span class="text-muted">Тип:</span>
+                            <span class="badge bg-info text-dark">{{ doc.doc_type }}</span>
+                        </li>
+                        {% if doc.source %}
+                        <li class="mb-1 text-truncate">
+                            <span class="text-muted">Джерело:</span> {{ doc.source }}
+                        </li>
+                        {% endif %}
+                        <li class="mt-2 pt-2 border-top text-muted smaller">
+                            <i class="bi bi-calendar3"></i> Додано: {{ doc.uploaded_at.strftime('%d.%m.%Y') }}
+                        </li>
+                    </ul>
+
+                    <div class="d-grid gap-2 mt-auto">
+                        <a href="{{ url_for('document_detail', doc_id=doc.id) }}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-eye"></i> Переглянути деталі
+                        </a>
+                        <a href="{{ url_for('download_document', doc_id=doc.id) }}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-download"></i> Завантажити файл
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
         {% endfor %}
     </div>
 {% else %}
-    <div class="text-center py-5">
-        <p class="text-muted fs-4">Документи не знайдено</p>
-        {% if request.args|length > 1 %}
-            <a href="{{ url_for('document_list') }}" class="btn btn-primary">Показати всі документи</a>
-        {% endif %}
+    <div class="alert alert-info text-center py-5">
+        <h4>Документів не знайдено</h4>
+        <p>Спробуйте змінити параметри пошуку або завантажте новий документ.</p>
     </div>
 {% endif %}
+
+<style>
+    /* Стиль для обмеження кількості рядків заголовка */
+    .text-truncate-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        min-height: 2.5em; 
+    }
+    
+    /* Ефект при наведенні */
+    .hover-shadow:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+    }
+    .transition-card {
+        transition: all 0.2s ease-in-out;
+    }
+    
+    .smaller {
+        font-size: 0.85em;
+    }
+</style>
+
 {% endblock %}

@@ -227,7 +227,6 @@ def create_app():
         k = Knowledge.query.get_or_404(k_id)
         if k.user_id != current_user.id: abort(403)
         
-        # ВИПРАВЛЕНО: Пряме отримання даних з форми
         new_text = request.form.get('text', '').strip()
         if new_text:
             k.text = new_text
@@ -237,6 +236,11 @@ def create_app():
             flash('Конспект оновлено', 'success')
         else:
             flash('Текст не може бути пустим', 'danger')
+        
+        # Повертаємось туди, звідки прийшли (якщо передано параметр next)
+        next_page = request.args.get('next')
+        if next_page:
+            return redirect(next_page)
             
         return redirect(url_for('my_knowledge'))
 
@@ -248,6 +252,12 @@ def create_app():
         db.session.delete(k)
         db.session.commit()
         flash('Конспект видалено', 'success')
+        
+        # Повертаємось туди, звідки прийшли (якщо передано параметр next)
+        next_page = request.args.get('next')
+        if next_page:
+            return redirect(next_page)
+
         return redirect(url_for('my_knowledge'))
 
     @app.route('/my/knowledge', methods=['GET', 'POST'])

@@ -3,130 +3,228 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-lg-9">
-        <div class="card shadow mb-4">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h4 class="mb-0">{{ doc.title }}</h4>
-                <a href="{{ url_for('download_document', doc_id=doc.id) }}" 
-                   class="btn btn-light btn-sm">Завантажити файл</a>
-            </div>
+    <div class="col-md-4 mb-4">
+        <div class="card shadow-sm sticky-top" style="top: 20px; z-index: 1;">
             <div class="card-body">
-                <table class="table table-borderless">
-                    <tr><th width="150">Автори</th><td>{{ doc.authors }}</td></tr>
-                    <tr><th>Рік публікації</th><td>{{ doc.year or '—' }}</td></tr>
-                    <tr><th>Тип документу</th><td><span class="badge bg-secondary">{{ doc.doc_type }}</span></td></tr>
-                    <tr><th>Джерело</th><td>{{ doc.source or 'Не вказано' }}</td></tr>
-                    <tr><th>Завантажено</th><td>{{ doc.uploaded_at.strftime('%d.%m.%Y %H:%M') }} 
-                        користувачем {{ doc.user.name }}</td></tr>
-                </table>
+                <h5 class="card-title">{{ doc.title }}</h5>
+                <h6 class="card-subtitle mb-3 text-muted">{{ doc.authors }}</h6>
+                
+                <ul class="list-unstyled small">
+                    {% if doc.year %}
+                    <li class="mb-2"><strong>Рік:</strong> {{ doc.year }}</li>
+                    {% endif %}
+                    {% if doc.source %}
+                    <li class="mb-2"><strong>Джерело:</strong> {{ doc.source }}</li>
+                    {% endif %}
+                    <li class="mb-2"><strong>Тип:</strong> <span class="badge bg-info text-dark">{{ doc.doc_type }}</span></li>
+                    <li class="mb-2"><strong>Додано:</strong> {{ doc.uploaded_at.strftime('%d.%m.%Y') }}</li>
+                </ul>
 
-                {% if current_user.role == 'admin' or current_user.id == doc.uploaded_by %}
-                <div class="mt-3 pt-3 border-top">
-                    <a href="{{ url_for('edit_document', doc_id=doc.id) }}" class="btn btn-warning btn-sm me-2">
-                        <i class="bi bi-pencil"></i> Редагувати
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('download_document', doc_id=doc.id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-download"></i> Завантажити файл
                     </a>
-                    <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteDocModal">
-                        <i class="bi bi-trash"></i> Видалити
-                    </button>
+                    
+                    {% if current_user.id == doc.uploaded_by or current_user.role == 'admin' %}
+                        <a href="{{ url_for('edit_document', doc_id=doc.id) }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-pencil"></i> Редагувати метадані
+                        </a>
+                        <button type="button" class="btn btn-outline-danger" onclick="confirmDelete('{{ url_for('delete_document', doc_id=doc.id) }}')">
+                            <i class="bi bi-trash"></i> Видалити документ
+                        </button>
+                    {% endif %}
                 </div>
-                {% endif %}
             </div>
         </div>
+    </div>
 
-        <div class="card shadow mb-4">
-            <div class="card-header">
-                <h5>Додати цитату / фрагмент як знання</h5>
+    <div class="col-md-8">
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-plus-circle"></i> Додати новий конспект
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('add_knowledge', doc_id=doc.id) }}">
+                <form action="{{ url_for('add_knowledge', doc_id=doc.id) }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     
                     <div class="mb-3">
-                        <label class="form-label">Виділений текст (цитата)</label>
-                        <textarea name="text" class="form-control" rows="4" required 
-                                  placeholder="Вставте або напишіть текст фрагменту..."></textarea>
+                        <label class="form-label text-muted small">Цитата або фрагмент тексту *</label>
+                        <textarea name="text" class="form-control auto-resize" placeholder="Вставте сюди текст із документу..." required></textarea>
                     </div>
+                    
                     <div class="mb-3">
-                        <label class="form-label">Ваша анотація / коментар (необов'язково)</label>
-                        <textarea name="note" class="form-control" rows="3" 
-                                  placeholder="Чому цей фрагмент важливий для вас?"></textarea>
+                        <label class="form-label text-muted small">Ваша анотація / коментар</label>
+                        <textarea name="note" class="form-control auto-resize" placeholder="Ваші думки щодо цього фрагменту..."></textarea>
                     </div>
+                    
                     <div class="mb-3">
-                        <label class="form-label">Теги (через кому)</label>
-                        <input type="text" name="tags" class="form-control" 
-                               placeholder="теорія, машинне навчання, 2025">
+                        <label class="form-label text-muted small">Теги</label>
+                        <input type="text" name="tags" class="form-control" placeholder="напр. вступ, методологія, важливо">
                     </div>
-                    <button type="submit" class="btn btn-success">Зберегти як знання</button>
+
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-save"></i> Зберегти конспект
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
 
-        <h4>Ваші збережені фрагменти з цього документу ({{ knowledges|length }})</h4>
+        <h4 class="mb-3">Збережені фрагменти <span class="badge bg-secondary rounded-pill fs-6">{{ knowledges|length }}</span></h4>
+        
         {% if knowledges %}
-            {% for k in knowledges %}
-            <div class="card mb-3 border-start border-primary border-4">
-                <div class="card-body">
-                    <blockquote class="mb-2">{{ k.text }}</blockquote>
-                    {% if k.note %}
-                        <p class="text-muted"><strong>Ваша анотація:</strong> {{ k.note }}</p>
-                    {% endif %}
-                    {% if k.tags %}
-                        <p class="mb-0">
-                            {% for tag in k.tags.split(',') %}
-                                <span class="badge bg-light text-dark">{{ tag.strip() }}</span>
-                            {% endfor %}
-                        </p>
-                    {% endif %}
-                    <small class="text-muted">Додано {{ k.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
-                </div>
-            </div>
-            {% endfor %}
-        {% else %}
-            <p class="text-muted">Ви ще не зберігали фрагменти з цього документу.</p>
-        {% endif %}
-    </div>
+            <div class="vstack gap-3">
+                {% for k in knowledges %}
+                <div class="card shadow-sm border-start border-primary border-4">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-end mb-2">
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editModal{{ k.id }}">
+                                            <i class="bi bi-pencil me-2"></i> Редагувати
+                                        </button>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <button type="button" class="dropdown-item text-danger" onclick="confirmDelete('{{ url_for('delete_knowledge', k_id=k.id, next=request.url) }}')">
+                                            <i class="bi bi-trash me-2"></i> Видалити
+                                        </button>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
 
-    <div class="col-lg-3">
-        <div class="card shadow-sm sticky-top" style="top: 100px;">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">Швидкі дії</h6>
+                        <blockquote class="blockquote fs-6">
+                            {{ k.text }}
+                        </blockquote>
+
+                        {% if k.note %}
+                            <div class="alert alert-light border mb-0 p-2 small">
+                                <i class="bi bi-chat-left-text me-2"></i> <strong>Примітка:</strong> {{ k.note }}
+                            </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between align-items-center mt-3">
+                            <div>
+                                {% if k.tags %}
+                                    {% for t in k.tags.split(',') %}
+                                        <span class="badge bg-light text-dark border">{{ t.strip() }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">{{ k.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal fade" id="editModal{{ k.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form action="{{ url_for('edit_knowledge', k_id=k.id, next=request.url) }}" method="POST">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Редагувати запис</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Текст</label>
+                                        <textarea name="text" class="form-control auto-resize" required>{{ k.text }}</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Примітка</label>
+                                        <textarea name="note" class="form-control auto-resize">{{ k.note }}</textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Теги</label>
+                                        <input type="text" name="tags" class="form-control" value="{{ k.tags }}">
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                                    <button type="submit" class="btn btn-primary">Зберегти</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
-            <div class="list-group list-group-flush">
-                <a href="{{ url_for('download_document', doc_id=doc.id) }}" 
-                   class="list-group-item list-group-item-action">Завантажити оригінал</a>
-                <a href="{{ url_for('document_list') }}" 
-                   class="list-group-item list-group-item-action">Повернутися до списку</a>
+        {% else %}
+            <div class="alert alert-info text-center">
+                Ще немає збережених конспектів для цього документу.
             </div>
-        </div>
+        {% endif %}
     </div>
 </div>
 
-<div class="modal fade" id="deleteDocModal" tabindex="-1" aria-labelledby="deleteDocModalLabel" aria-hidden="true">
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title" id="deleteDocModalLabel">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Видалення документа
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title">Видалення</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="fs-5 fw-medium">Ви впевнені, що хочете видалити цей документ?</p>
-                <div class="alert alert-warning d-flex align-items-center" role="alert">
-                    <i class="bi bi-info-circle-fill me-2"></i>
-                    <div>
-                        Цю дію <strong>не можна скасувати</strong>. Всі пов'язані з документом конспекти також будуть видалені.
-                    </div>
-                </div>
+                <p>Ви дійсно бажаєте видалити цей елемент?</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Ні, залишити</button>
-                <form action="{{ url_for('delete_document', doc_id=doc.id) }}" method="POST">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <form id="deleteConfirmForm" method="POST" action="">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-danger">Так, видалити назавжди</button>
+                    <button type="submit" class="btn btn-danger">Видалити</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<style>
+    textarea.auto-resize {
+        resize: none;
+        overflow-y: hidden;
+        min-height: 80px;
+        transition: height 0.1s ease-out;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // --- Автозміна розміру ---
+        const textareas = document.querySelectorAll("textarea.auto-resize");
+
+        function resize(el) {
+            el.style.height = "auto"; 
+            el.style.height = (el.scrollHeight) + "px"; 
+        }
+
+        textareas.forEach(tx => {
+            tx.addEventListener("input", () => resize(tx));
+            resize(tx);
+        });
+
+        // Оновлюємо розмір при відкритті модального вікна
+        var modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            modal.addEventListener('shown.bs.modal', function () {
+                modal.querySelectorAll('textarea.auto-resize').forEach(tx => resize(tx));
+            });
+        });
+
+        // --- Видалення ---
+        window.confirmDelete = function(url) {
+            const form = document.getElementById('deleteConfirmForm');
+            form.action = url;
+            const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+            modal.show();
+        };
+    });
+</script>
+
 {% endblock %}
