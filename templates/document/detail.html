@@ -186,6 +186,7 @@
 </div>
 
 <style>
+    /* Стилі для авто-висоти текстового поля */
     textarea.auto-resize {
         resize: none;
         overflow-y: hidden;
@@ -196,7 +197,7 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // --- Автозміна розміру ---
+        // Логіка для авто-зміни висоти textarea
         const textareas = document.querySelectorAll("textarea.auto-resize");
 
         function resize(el) {
@@ -209,7 +210,7 @@
             resize(tx);
         });
 
-        // Оновлюємо розмір при відкритті модального вікна
+        // Виправляємо висоту при відкритті модалки
         var modals = document.querySelectorAll('.modal');
         modals.forEach(modal => {
             modal.addEventListener('shown.bs.modal', function () {
@@ -217,7 +218,7 @@
             });
         });
 
-        // --- Видалення ---
+        // Функція виклику модалки видалення
         window.confirmDelete = function(url) {
             const form = document.getElementById('deleteConfirmForm');
             form.action = url;

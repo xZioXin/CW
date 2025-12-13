@@ -313,7 +313,7 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Auto-resize textarea
+        // Автоматична зміна розміру текстових полів
         const textareas = document.querySelectorAll("textarea.auto-resize");
         function resize(el) {
             el.style.height = "auto";
@@ -327,7 +327,7 @@
             });
         });
 
-        // Click ordering for DOCX export
+        // Збереження порядку обраних елементів для експорту
         const orderedInput = document.getElementById('ordered_ids');
         let selectedOrder = [];
         document.querySelectorAll('.knowledge-checkbox').forEach(cb => {
@@ -341,9 +341,9 @@
                 orderedInput.value = selectedOrder.join(',');
             });
         });
-        }
     });
 
+    // Підтвердження видалення
     function confirmDelete(url) {
         const form = document.getElementById('deleteConfirmForm');
         form.action = url;
