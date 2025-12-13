@@ -134,44 +134,49 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="modal fade" id="editKnowledgeModal{{ k.id }}" tabindex="-1">
-                        <div class="modal-dialog">
-                            <div class="modal-content">
-                                <form action="{{ url_for('edit_knowledge', k_id=k.id) }}" method="POST">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    <div class="modal-header">
-                                        <h5 class="modal-title">Редагувати конспект</h5>
-                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                    </div>
-                                    <div class="modal-body">
-                                        <div class="mb-3">
-                                            <label class="form-label">Текст цитати</label>
-                                            <textarea name="text" class="form-control auto-resize" required>{{ k.text }}</textarea>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Анотація</label>
-                                            <textarea name="note" class="form-control auto-resize">{{ k.note }}</textarea>
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">Теги</label>
-                                            <input type="text" name="tags" class="form-control" value="{{ k.tags }}">
-                                        </div>
-                                    </div>
-                                    <div class="modal-footer">
-                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
-                                        <button type="submit" class="btn btn-primary">Зберегти зміни</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
                     {% endfor %}
                 </div>
             {% else %}
                 <p class="text-muted text-center py-5">Список порожній.</p>
             {% endif %}
         </form>
+
+        {% if knowledges %}
+            {% for k in knowledges %}
+            <div class="modal fade" id="editKnowledgeModal{{ k.id }}" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <form action="{{ url_for('edit_knowledge', k_id=k.id) }}" method="POST">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Редагувати конспект</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label class="form-label">Текст цитати</label>
+                                    <textarea name="text" class="form-control auto-resize" required>{{ k.text }}</textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Анотація</label>
+                                    <textarea name="note" class="form-control auto-resize">{{ k.note }}</textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Теги</label>
+                                    <input type="text" name="tags" class="form-control" value="{{ k.tags }}">
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                                <button type="submit" class="btn btn-primary">Зберегти зміни</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+
     </div>
 
     <div class="tab-pane fade {% if active_tab == 'collections' %}show active{% endif %}" id="collections" role="tabpanel">
@@ -195,7 +200,7 @@
                         </select>
                     </div>
                     <div class="col-md-2">
-                        <button type="submit" class="btn btn-primary w-100">Фільтрувати</button>
+                        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Знайти</button>
                     </div>
                 </form>
             </div>
