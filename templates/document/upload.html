@@ -1,55 +1,59 @@
 {% extends "base.html" %}
-{% block title %}Завантажити документ{% endblock %}
+{% block title %}{{ title if title else 'Завантаження документу' }}{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
-    <div class="col-lg-8">
-     <h2 class="mb-4">Завантаження нового документу</h2>
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">{{ title if title else 'Новий документ' }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
 
-     <div class="card shadow">
-         <div class="card-body p-5">
-             <form method="POST" enctype="multipart/form-data">
-                 {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.title.label(class="form-label") }}
+                        {{ form.title(class="form-control") }}
+                    </div>
 
-                 <div class="mb-3">
-                     {{ form.title.label(class="form-label") }}
-                     {{ form.title(class="form-control form-control-lg") }}
-                 </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.authors.label(class="form-label") }}
+                            {{ form.authors(class="form-control") }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.year.label(class="form-label") }}
+                            {{ form.year(class="form-control") }}
+                        </div>
+                    </div>
 
-                 <div class="mb-3">
-                     {{ form.authors.label(class="form-label") }}
-                     {{ form.authors(class="form-control form-control-lg", placeholder="Прізвище І. Б., Прізвище А. В.") }}
-                 </div>
+                    <div class="mb-3">
+                        {{ form.source.label(class="form-label") }}
+                        {{ form.source(class="form-control") }}
+                    </div>
 
-                 <div class="row">
-                     <div class="col-md-4 mb-3">
-                         {{ form.year.label(class="form-label") }}
-                         {{ form.year(class="form-control form-control-lg", placeholder="2024") }}
-                     </div>
-                     <div class="col-md-8 mb-3">
-                         {{ form.doc_type.label(class="form-label") }}
-                         {{ form.doc_type(class="form-control form-control-lg") }}
-                     </div>
-                 </div>
+                    <div class="mb-3">
+                        {{ form.doc_type.label(class="form-label") }}
+                        {{ form.doc_type(class="form-select") }}
+                    </div>
 
-                 <div class="mb-4">
-                     {{ form.source.label(class="form-label") }}
-                     {{ form.source(class="form-control form-control-lg", placeholder="Назва журналу, конференції, URL тощо") }}
-                 </div>
+                    <div class="mb-4">
+                        {{ form.file.label(class="form-label") }}
+                        {{ form.file(class="form-control") }}
+                        <div class="form-text">Дозволені формати: PDF, DOCX</div>
+                    </div>
 
-                 <div class="mb-4">
-                     {{ form.file.label(class="form-label") }}
-                     {{ form.file(class="form-control form-control-lg") }}
-                     <div class="form-text">Дозволені формати: PDF, DOCX. Максимум 50 МБ.</div>
-                 </div>
-
-                 <div class="d-grid">
-                     {{ form.submit(class="btn btn-primary btn-lg px-5") }}
-                     <a href="{{ url_for('document_list') }}" class="btn btn-outline-secondary btn-lg ms-3">Скасувати</a>
-                 </div>
-             </form>
-         </div>
-     </div>
- </div>
+                    <div class="d-grid gap-2">
+                        {{ form.submit(class="btn btn-primary btn-lg") }}
+                        
+                        <a href="{{ url_for('document_list') }}" class="btn btn-link text-muted text-decoration-none">
+                            Скасувати та повернутися назад
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

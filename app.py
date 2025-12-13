@@ -25,6 +25,9 @@ def create_app():
     os.makedirs(app.instance_path, exist_ok=True)
 
     db.init_app(app)
+    # Для CSRF токена у формах без FlaskForm
+    from flask_wtf.csrf import CSRFProtect
+    csrf = CSRFProtect(app)
 
     from flask_login import LoginManager
     login_manager = LoginManager(app)
@@ -40,19 +43,19 @@ def create_app():
     @app.context_processor
     def inject_recent():
         if current_user.is_authenticated:
-            # Останні 5 переглянутих унікальних документів
-            # (складніший запит, щоб не дублювати, спрощуємо: беремо всі і фільтруємо в python або просто останні записи)
+            # Останні 10 переглянутих
             recent_views = RecentlyViewed.query.filter_by(user_id=current_user.id)\
-                .order_by(RecentlyViewed.viewed_at.desc()).limit(10).all()
+                .order_by(RecentlyViewed.viewed_at.desc()).limit(20).all() # беремо із запасом
             
-            # Прибираємо дублікати (залишаємо останній перегляд)
             seen = set()
             unique_recent = []
             for view in recent_views:
                 if view.document_id not in seen:
                     unique_recent.append(view.document)
                     seen.add(view.document_id)
-            return dict(recently_viewed_docs=unique_recent[:5])
+                if len(unique_recent) >= 10: break
+            
+            return dict(recently_viewed_docs=unique_recent)
         return dict(recently_viewed_docs=[])
 
     with app.app_context():
@@ -64,7 +67,7 @@ def create_app():
             db.session.add(admin)
             db.session.commit()
 
-    # === Маршрути ===
+    # === Основні маршрути ===
 
     @app.route('/')
     def index():
@@ -104,7 +107,7 @@ def create_app():
         flash('Ви вийшли з системи', 'info')
         return redirect(url_for('index'))
 
-    # === DOCUMENTS ===
+    # === Документи ===
 
     @app.route('/document/upload', methods=['GET', 'POST'])
     @login_required
@@ -145,12 +148,10 @@ def create_app():
         if form.validate_on_submit():
             form.populate_obj(doc)
             if form.file.data:
-                # Обробка нового файлу
                 f = form.file.data
                 ext = os.path.splitext(f.filename)[1].lower()
                 new_filename = str(uuid.uuid4()) + ext
                 f.save(os.path.join(app.config['UPLOAD_FOLDER'], new_filename))
-                # Видалення старого
                 try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'], doc.stored_filename))
                 except: pass
                 doc.stored_filename = new_filename
@@ -187,7 +188,7 @@ def create_app():
         year_from = request.args.get('year_from', type=int)
         year_to = request.args.get('year_to', type=int)
         doc_type = request.args.get('type', '')
-        show_my = request.args.get('show_my')  # Фільтр "Тільки мої"
+        show_my = request.args.get('show_my')
 
         docs = Document.query
 
@@ -199,10 +200,7 @@ def create_app():
         if year_from: docs = docs.filter(Document.year >= year_from)
         if year_to: docs = docs.filter(Document.year <= year_to)
         if doc_type: docs = docs.filter_by(doc_type=doc_type)
-        
-        # 4. Фільтр "Тільки мої"
-        if show_my == '1':
-            docs = docs.filter_by(uploaded_by=current_user.id)
+        if show_my == '1': docs = docs.filter_by(uploaded_by=current_user.id)
 
         documents = docs.order_by(Document.uploaded_at.desc()).all()
         return render_template('document/list.html', documents=documents)
@@ -211,12 +209,9 @@ def create_app():
     @login_required
     def document_detail(doc_id):
         doc = Document.query.get_or_404(doc_id)
-        
-        # 3. Запис в історію переглядів
         view = RecentlyViewed(user_id=current_user.id, document_id=doc_id)
         db.session.add(view)
         db.session.commit()
-
         knowledges = Knowledge.query.filter_by(document_id=doc_id, user_id=current_user.id).all()
         return render_template('document/detail.html', doc=doc, knowledges=knowledges)
 
@@ -227,7 +222,7 @@ def create_app():
         return send_from_directory(app.config['UPLOAD_FOLDER'], doc.stored_filename,
                                    as_attachment=True, download_name=doc.original_filename)
 
-    # === KNOWLEDGE & COLLECTIONS ===
+    # === Знання та Колекції ===
 
     @app.route('/knowledge/add/<int:doc_id>', methods=['POST'])
     @login_required
@@ -242,74 +237,119 @@ def create_app():
             flash('Збережено!', 'success')
         return redirect(url_for('document_detail', doc_id=doc_id))
 
-    @app.route('/knowledge/<int:k_id>/edit', methods=['GET', 'POST'])
+    @app.route('/knowledge/<int:k_id>/edit', methods=['POST'])
     @login_required
     def edit_knowledge(k_id):
         k = Knowledge.query.get_or_404(k_id)
         if k.user_id != current_user.id: abort(403)
-        form = KnowledgeForm(obj=k)
-        if form.validate_on_submit():
+        
+        # Використовуємо request.form для прив'язки даних
+        form = KnowledgeForm(request.form, obj=k)
+        
+        if form.validate(): # validate() замість validate_on_submit() бо це сабміт з модалки вручну
             form.populate_obj(k)
             db.session.commit()
             flash('Конспект оновлено', 'success')
-            return redirect(url_for('my_knowledge'))
-        return render_template('base.html', content=f"<h1>Редагувати помилка (потрібен шаблон)</h1>") # Використовуємо modal або окрему сторінку, тут спрощено редірект
+        else:
+            flash('Помилка валідації. Перевірте дані.', 'danger')
+            
+        return redirect(url_for('my_knowledge'))
 
     @app.route('/knowledge/<int:k_id>/delete', methods=['POST'])
     @login_required
     def delete_knowledge(k_id):
         k = Knowledge.query.get_or_404(k_id)
-        if k.user_id != current_user.id:
-            abort(403)
-            
-        # Явно очищаємо зв'язки з колекціями перед видаленням
-        # Це гарантує видалення з таблиці collection_knowledge
+        if k.user_id != current_user.id: abort(403)
         k.collections = [] 
-        db.session.commit() # Зберігаємо стан "без колекцій"
-
-        # Тепер видаляємо сам конспект
         db.session.delete(k)
         db.session.commit()
-        
         flash('Конспект видалено', 'success')
-        return redirect(request.referrer or url_for('my_knowledge'))
+        return redirect(url_for('my_knowledge'))
 
     @app.route('/my/knowledge', methods=['GET', 'POST'])
     @login_required
     def my_knowledge():
-        # Пошук та фільтрація
         q = request.args.get('q', '').strip()
         tag = request.args.get('tag', '').strip()
         
         query = Knowledge.query.filter_by(user_id=current_user.id)
-        if q:
-            query = query.filter( (Knowledge.text.ilike(f'%{q}%')) | (Knowledge.note.ilike(f'%{q}%')) )
-        if tag:
-            query = query.filter(Knowledge.tags.ilike(f'%{tag}%'))
+        if q: query = query.filter( (Knowledge.text.ilike(f'%{q}%')) | (Knowledge.note.ilike(f'%{q}%')) )
+        if tag: query = query.filter(Knowledge.tags.ilike(f'%{tag}%'))
             
         knowledges = query.order_by(Knowledge.created_at.desc()).all()
         collections = Collection.query.filter_by(user_id=current_user.id).all()
         
-        # Обробка додавання вибраних до колекції
         if request.method == 'POST':
-            collection_id = request.form.get('collection_id')
-            selected_ids = request.form.getlist('knowledge_ids')
-            if collection_id and selected_ids:
-                coll = Collection.query.get(collection_id)
-                if coll and coll.user_id == current_user.id:
-                    count = 0
-                    for kid in selected_ids:
-                        kn = Knowledge.query.get(int(kid))
-                        if kn and kn.user_id == current_user.id and kn not in coll.knowledges:
-                            coll.knowledges.append(kn)
-                            count += 1
-                    db.session.commit()
-                    flash(f'Додано {count} записів до колекції "{coll.name}"', 'success')
-            return redirect(url_for('my_knowledge'))
+            action = request.form.get('action')
+            
+            # 1. ЕКСПОРТ В DOCX
+            if action == 'export_docx':
+                selected_ids = request.form.getlist('knowledge_ids')
+                ordered_ids_str = request.form.get('ordered_ids', '')
+                
+                if not selected_ids:
+                    flash('Нічого не вибрано', 'warning')
+                    return redirect(url_for('my_knowledge'))
+
+                # Впорядковуємо згідно з порядком кліків
+                final_ids = []
+                if ordered_ids_str:
+                    click_order = ordered_ids_str.split(',')
+                    # Беремо тільки ті, що реально вибрані (чекнуті)
+                    for oid in click_order:
+                        if oid in selected_ids:
+                            final_ids.append(int(oid))
+                    # Додаємо ті, що вибрані, но чомусь не потрапили в order (на всяк випадок)
+                    for sid in selected_ids:
+                        if int(sid) not in final_ids:
+                            final_ids.append(int(sid))
+                else:
+                    final_ids = [int(x) for x in selected_ids]
+
+                # Отримуємо об'єкти з БД, але зберігаємо порядок списку final_ids
+                # SQL IN не гарантує порядок, тому сортуємо вручну в Python
+                k_objects = Knowledge.query.filter(Knowledge.id.in_(final_ids)).all()
+                k_map = {k.id: k for k in k_objects}
+                sorted_knowledge = [k_map[fid] for fid in final_ids if fid in k_map]
+
+                # Генерація DOCX
+                doc = DocxDoc()
+                doc.add_heading('Експортовані конспекти', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
+                
+                for i, k in enumerate(sorted_knowledge, 1):
+                    doc.add_heading(f"{i}. {k.document.title}", level=1)
+                    doc.add_paragraph(f"Автори: {k.document.authors}")
+                    doc.add_paragraph(k.text, style='Intense Quote')
+                    if k.note:
+                        p = doc.add_paragraph()
+                        p.add_run("Примітка: ").bold = True
+                        p.add_run(k.note)
+                    doc.add_paragraph()
+
+                buffer = BytesIO()
+                doc.save(buffer)
+                buffer.seek(0)
+                return send_file(buffer, as_attachment=True, download_name=f"export_{datetime.now().strftime('%H-%M')}.docx",
+                                 mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+
+            # 2. ДОДАВАННЯ ДО КОЛЕКЦІЇ
+            elif action == 'add_to_collection':
+                collection_id = request.form.get('collection_id')
+                selected_ids = request.form.getlist('knowledge_ids')
+                if collection_id and selected_ids:
+                    coll = Collection.query.get(collection_id)
+                    if coll and coll.user_id == current_user.id:
+                        count = 0
+                        for kid in selected_ids:
+                            kn = Knowledge.query.get(int(kid))
+                            if kn and kn.user_id == current_user.id and kn not in coll.knowledges:
+                                coll.knowledges.append(kn)
+                                count += 1
+                        db.session.commit()
+                        flash(f'Додано {count} записів', 'success')
+                return redirect(url_for('my_knowledge'))
 
         return render_template('knowledge/list.html', knowledges=knowledges, collections=collections)
-
-    # === COLLECTION MANAGEMENT ===
 
     @app.route('/collection/create', methods=['POST'])
     @login_required
@@ -319,10 +359,9 @@ def create_app():
             if not Collection.query.filter_by(name=name, user_id=current_user.id).first():
                 db.session.add(Collection(name=name, user_id=current_user.id))
                 db.session.commit()
-                flash(f'Колекція "{name}" створена', 'success')
             else:
-                flash('Колекція з такою назвою вже існує', 'warning')
-        return redirect(url_for('my_knowledge'))
+                flash('Вже існує', 'warning')
+        return redirect(url_for('my_knowledge', _anchor='collections'))
 
     @app.route('/collection/<int:c_id>/delete', methods=['POST'])
     @login_required
@@ -331,20 +370,16 @@ def create_app():
         if c.user_id != current_user.id: abort(403)
         db.session.delete(c)
         db.session.commit()
-        flash('Колекцію видалено', 'success')
-        return redirect(url_for('my_knowledge'))
+        return redirect(url_for('my_knowledge', _anchor='collections'))
     
     @app.route('/collection/<int:c_id>/rename', methods=['POST'])
     @login_required
     def rename_collection(c_id):
         c = Collection.query.get_or_404(c_id)
         if c.user_id != current_user.id: abort(403)
-        new_name = request.form.get('name', '').strip()
-        if new_name:
-            c.name = new_name
-            db.session.commit()
-            flash('Колекцію перейменовано', 'success')
-        return redirect(url_for('my_knowledge'))
+        c.name = request.form.get('name', c.name)
+        db.session.commit()
+        return redirect(url_for('my_knowledge', _anchor='collections'))
 
     @app.route('/collection/<int:c_id>/remove_item/<int:k_id>', methods=['POST'])
     @login_required
@@ -355,8 +390,8 @@ def create_app():
         if k in c.knowledges:
             c.knowledges.remove(k)
             db.session.commit()
-            flash('Запис прибрано з колекції', 'info')
-        return redirect(url_for('my_knowledge'))
+        # Повертаємось на вкладку колекцій за допомогою якоря #collections
+        return redirect(url_for('my_knowledge', _anchor='collections'))
 
     @app.route('/collection/<int:c_id>/export/docx')
     @login_required
@@ -364,17 +399,9 @@ def create_app():
         c = Collection.query.get_or_404(c_id)
         if c.user_id != current_user.id: abort(403)
         
-        knowledges = c.knowledges
-        if not knowledges:
-            flash('Колекція порожня', 'warning')
-            return redirect(url_for('my_knowledge'))
-        
-        # Генерація DOCX (функція винесена для чистоти, але тут inline для copy-paste)
         doc = DocxDoc()
         doc.add_heading(f'Колекція: {c.name}', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph(f'Дата: {datetime.now().strftime("%d.%m.%Y")}')
-        
-        for i, k in enumerate(knowledges, 1):
+        for i, k in enumerate(c.knowledges, 1):
             doc.add_heading(f"{i}. {k.document.title}", level=1)
             doc.add_paragraph(f"Автори: {k.document.authors}")
             doc.add_paragraph(k.text, style='Intense Quote')
@@ -382,22 +409,15 @@ def create_app():
                 p = doc.add_paragraph()
                 p.add_run("Примітка: ").bold = True
                 p.add_run(k.note)
-            if k.tags:
-                doc.add_paragraph(f"Теги: {k.tags}").italic = True
             doc.add_paragraph()
 
         buffer = BytesIO()
         doc.save(buffer)
         buffer.seek(0)
+        return send_file(buffer, as_attachment=True, download_name=f"{secure_filename(c.name)}.docx",
+                         mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
         
-        safe_name = secure_filename(c.name) or "collection"
-        return send_file(
-            buffer, as_attachment=True,
-            download_name=f"{safe_name}.docx",
-            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        )
-        
-    # === ADMIN ===
+    # === Адмінка ===
 
     @app.route('/admin/users')
     @login_required
@@ -410,9 +430,7 @@ def create_app():
     @login_required
     def toggle_user(user_id):
         if current_user.role != 'admin': abort(403)
-        if user_id == current_user.id:
-            flash('Неможливо заблокувати себе', 'warning')
-            return redirect(url_for('admin_users'))
+        if user_id == current_user.id: return redirect(url_for('admin_users'))
         user = User.query.get_or_404(user_id)
         user.is_active = not user.is_active
         db.session.commit()
