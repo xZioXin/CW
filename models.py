@@ -41,10 +41,9 @@ class Document(db.Model):
     source = db.Column(db.Text)
     doc_type = db.Column(db.String(50))
     
-    # Оригінальна назва файлу (з пробілами, кирилицею, скобками)
+    # Оригінальна назва файлу
     original_filename = db.Column(db.String(300), nullable=False)
-    
-    # Безпечна назва для збереження на диску (унікальна)
+    # Безпечна назва для збереження на диску
     stored_filename = db.Column(db.String(200), nullable=False, unique=True)
     
     uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -57,8 +56,8 @@ class Knowledge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     document_id = db.Column(db.Integer, db.ForeignKey('document.id'))
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    text = db.Column(db.Text, nullable=False)           # цитата або виділений фрагмент
-    note = db.Column(db.Text)                           # власна анотація
+    text = db.Column(db.Text, nullable=False)           
+    note = db.Column(db.Text)                           
     tags = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -77,3 +76,12 @@ class Collection(db.Model):
     user = db.relationship('User', backref='collections')
     knowledges = db.relationship('Knowledge', secondary=collection_knowledge,
                                  back_populates='collections')
+
+class RecentlyViewed(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    document_id = db.Column(db.Integer, db.ForeignKey('document.id'))
+    viewed_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='viewed_history')
+    document = db.relationship('Document')

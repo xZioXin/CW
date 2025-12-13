@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileRequired, FileAllowed
-from wtforms import StringField, PasswordField, SubmitField, TextAreaField, IntegerField, SelectField, SelectMultipleField
+from wtforms import StringField, PasswordField, SubmitField, TextAreaField, IntegerField, SelectField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional
 
 class RegistrationForm(FlaskForm):
@@ -35,7 +35,6 @@ class DocumentForm(FlaskForm):
     submit = SubmitField('Завантажити')
 
 class DocumentEditForm(DocumentForm):
-    # У формі редагування файл не є обов'язковим
     file = FileField('Оновити файл (залиште пустим, якщо не змінюєте)', validators=[
         FileAllowed(['pdf', 'docx'], 'Тільки PDF та DOCX!')
     ])
@@ -45,8 +44,8 @@ class KnowledgeForm(FlaskForm):
     text = TextAreaField('Виділений фрагмент / цитата', validators=[DataRequired()])
     note = TextAreaField('Ваша анотація / коментар', validators=[Optional()])
     tags = StringField('Теги (через кому)')
-    submit = SubmitField('Зберегти як знання')
+    submit = SubmitField('Зберегти')
 
 class CollectionForm(FlaskForm):
     name = StringField('Назва колекції', validators=[DataRequired()])
-    submit = SubmitField('Створити колекцію')
+    submit = SubmitField('Зберегти')

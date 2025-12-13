@@ -1,170 +1,224 @@
 {% extends "base.html" %}
-{% block title %}Мої знання{% endblock %}
+{% block title %}Мої знання та колекції{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Мої знання та конспекти</h2>
+<h2 class="mb-4">Моя база знань</h2>
 
-<div class="row">
-    <!-- Ліва колонка — фрагменти -->
-    <div class="col-lg-8">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Збережені фрагменти ({{ knowledges|length }})</h5>
-                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createCollectionModal">
-                    Створити колекцію
-                </button>
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-2">
+            <div class="col-md-6">
+                <input type="text" name="q" class="form-control" placeholder="Пошук по тексту або примітці..." value="{{ request.args.get('q', '') }}">
             </div>
-            <div class="card-body">
-                {% if knowledges %}
-                    {% for k in knowledges %}
-                        <div class="border-start border-primary border-4 ps-3 mb-4">
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" name="knowledge_id" value="{{ k.id }}" id="k{{ k.id }}">
-                                <label class="form-check-label" for="k{{ k.id }}"></label>
-                            </div>
-
-                            <blockquote class="mb-2 fs-6">
-                                {{ k.text|truncate(400) }}
-                                {% if k.text|length > 400 %}
-                                    <a href="{{ url_for('document_detail', doc_id=k.document.id) }}" class="small">…далі</a>
-                                {% endif %}
-                            </blockquote>
-
-                            <p class="small text-muted mb-1">
-                                Джерело: 
-                                <a href="{{ url_for('document_detail', doc_id=k.document.id) }}">
-                                    {{ k.document.title }}
-                                </a>
-                                <span class="text-secondary"> • {{ k.document.authors }} ({{ k.document.year or '—' }})</span>
-                            </p>
-
-                            {% if k.note %}
-                                <p class="mb-2"><strong>Анотація:</strong> {{ k.note }}</p>
-                            {% endif %}
-
-                            {% if k.tags %}
-                                <div class="mb-2">
-                                    {% for tag in k.tags.split(',') %}
-                                        <span class="badge bg-light text-dark me-1">{{ tag.strip() }}</span>
-                                    {% endfor %}
-                                </div>
-                            {% endif %}
-
-                            <small class="text-muted">
-                                Додано {{ k.created_at.strftime('%d.%m.%Y о %H:%M') }}
-                            </small>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <p class="text-muted text-center py-5">Ви ще не зберегли жодного фрагменту.</p>
-                {% endif %}
+            <div class="col-md-4">
+                <input type="text" name="tag" class="form-control" placeholder="Фільтр по тегу" value="{{ request.args.get('tag', '') }}">
             </div>
-        </div>
-    </div>
-
-    <!-- Права колонка — колекції + конспект -->
-    <div class="col-lg-4">
-        <div class="card shadow-sm mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Тематичні колекції</h5>
-            </div>
-            <div class="list-group list-group-flush">
-                {% if collections %}
-                    {% for coll in collections %}
-                        <a href="#" class="list-group-item list-group-item-action">
-                            <div class="d-flex justify-content-between">
-                                <span>{{ coll.name }}</span>
-                                <span class="badge bg-primary rounded-pill">0</span>
-                            </div>
-                        </a>
-                    {% endfor %}
-                {% else %}
-                    <div class="list-group-item text-center text-muted py-4">
-                        Колекцій немає<br>
-                        <button class="btn btn-sm btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#createCollectionModal">
-                            Створити
-                        </button>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- Формування конспекту -->
-        <div class="card shadow-sm">
-            <div class="card-body text-center">
-                <h5>Сформувати конспект</h5>
-                <button id="generateSummaryBtn" class="btn btn-success btn-lg w-100 mb-3" disabled>
-                    Сформувати конспект
-                </button>
-
-                <div id="exportButtons" class="d-none">
-                    <a id="docxLink" class="btn btn-outline-primary btn-sm w-100 mb-2">Word (.docx)</a>
-                    <a id="pdfLink" class="btn btn-outline-danger btn-sm w-100">PDF</a>
-                </div>
-
-                <div class="mt-3">
-                    <input type="checkbox" id="selectAll">
-                    <label for="selectAll" class="small text-muted">Позначити всі</label>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Модальне вікно -->
-<div class="modal fade" id="createCollectionModal" tabindex="-1">
-    <div class="modal-dialog">
-        <form method="POST" action="{{ url_for('create_collection') }}">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title">Нова колекція</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="text" name="name" class="form-control form-control-lg" placeholder="Назва колекції" required>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
-                    <button type="submit" class="btn btn-primary">Створити</button>
-                </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Шукати</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- JavaScript — повністю безпечний -->
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('input[name="knowledge_id"]');
-    const btn = document.getElementById('generateSummaryBtn');
-    const exportDiv = document.getElementById('exportButtons');
+<ul class="nav nav-tabs mb-4" id="knowledgeTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">Усі конспекти</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="collections-tab" data-bs-toggle="tab" data-bs-target="#collections" type="button" role="tab">Колекції</button>
+    </li>
+</ul>
 
-    function updateButtons() {
-        const checked = document.querySelectorAll('input[name="knowledge_id"]:checked');
-        if (checked.length > 0) {
-            btn.disabled = false;
-            btn.textContent = `Сформувати конспект (${checked.length})`;
+<div class="tab-content" id="knowledgeTabContent">
+    
+    <div class="tab-pane fade show active" id="all" role="tabpanel">
+        <form method="POST" id="bulkForm">
+            <div class="d-flex align-items-center mb-3 p-2 bg-light rounded">
+                <span class="me-2">З обраними:</span>
+                <select name="collection_id" class="form-select w-auto d-inline-block me-2">
+                    <option value="">-- Додати до колекції --</option>
+                    {% for c in collections %}
+                        <option value="{{ c.id }}">{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-success btn-sm">Додати</button>
+            </div>
 
-            const ids = Array.from(checked).map(c => c.value).join(',');
-            document.getElementById('docxLink').href = `/knowledge/export/docx?ids=${ids}`;
-            document.getElementById('pdfLink').href = `/knowledge/export/pdf?ids=${ids}`;
-            exportDiv.classList.remove('d-none');
-        } else {
-            btn.disabled = true;
-            btn.textContent = 'Сформувати конспект';
-            exportDiv.classList.add('d-none');
-        }
+            {% if knowledges %}
+                <div class="row row-cols-1 g-3">
+                    {% for k in knowledges %}
+                    <div class="col">
+                        <div class="card shadow-sm border-start border-primary border-4">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="knowledge_ids" value="{{ k.id }}">
+                                        <h6 class="card-title d-inline ms-2">
+                                            <a href="{{ url_for('document_detail', doc_id=k.document.id) }}">{{ k.document.title }}</a>
+                                        </h6>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editKnowledgeModal{{ k.id }}">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        
+                                        <button type="submit" form="delete-form-{{ k.id }}" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <blockquote class="blockquote fs-6 mt-2">{{ k.text }}</blockquote>
+                                {% if k.note %}
+                                    <p class="mb-1 text-muted small bg-light p-2 rounded">{{ k.note }}</p>
+                                {% endif %}
+                                <div class="d-flex justify-content-between align-items-end mt-2">
+                                    <div>
+                                        {% if k.tags %}
+                                            {% for t in k.tags.split(',') %}
+                                                <span class="badge bg-secondary">{{ t.strip() }}</span>
+                                            {% endfor %}
+                                        {% endif %}
+                                    </div>
+                                    <small class="text-muted">{{ k.created_at.strftime('%d.%m.%Y') }}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal fade" id="editKnowledgeModal{{ k.id }}" tabindex="-1">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form action="{{ url_for('edit_knowledge', k_id=k.id) }}" method="POST">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Редагувати конспект</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <label>Текст цитати</label>
+                                            <textarea name="text" class="form-control auto-resize" required>{{ k.text }}</textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label>Анотація</label>
+                                            <textarea name="note" class="form-control auto-resize">{{ k.note }}</textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label>Теги</label>
+                                            <input type="text" name="tags" class="form-control" value="{{ k.tags }}">
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="submit" class="btn btn-primary">Зберегти</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted text-center py-5">Нічого не знайдено.</p>
+            {% endif %}
+        </form>
+
+        {% for k in knowledges %}
+        <form id="delete-form-{{ k.id }}" action="{{ url_for('delete_knowledge', k_id=k.id) }}" method="POST" class="d-none" onsubmit="return confirm('Видалити цей конспект?');">
+        </form>
+        {% endfor %}
+    </div>
+
+    <div class="tab-pane fade" id="collections" role="tabpanel">
+        <form action="{{ url_for('create_collection') }}" method="POST" class="row g-2 mb-4 align-items-center">
+            <div class="col-auto">
+                <input type="text" name="name" class="form-control" placeholder="Назва нової колекції" required>
+            </div>
+            <div class="col-auto">
+                <button type="submit" class="btn btn-primary">Створити</button>
+            </div>
+        </form>
+
+        <div class="accordion" id="accordionCollections">
+            {% for c in collections %}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="heading{{ c.id }}">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ c.id }}">
+                        {{ c.name }} <span class="badge bg-secondary ms-2">{{ c.knowledges|length }}</span>
+                    </button>
+                </h2>
+                <div id="collapse{{ c.id }}" class="accordion-collapse collapse" data-bs-parent="#accordionCollections">
+                    <div class="accordion-body bg-light">
+                        <div class="mb-3 border-bottom pb-2">
+                            <a href="{{ url_for('export_collection_docx', c_id=c.id) }}" class="btn btn-success btn-sm me-2">
+                                <i class="bi bi-file-word"></i> Завантажити DOCX
+                            </a>
+                            <form action="{{ url_for('rename_collection', c_id=c.id) }}" method="POST" class="d-inline-block me-2">
+                                <div class="input-group input-group-sm">
+                                    <input type="text" name="name" class="form-control" value="{{ c.name }}" style="width: 150px;">
+                                    <button class="btn btn-outline-secondary" type="submit">Змінити назву</button>
+                                </div>
+                            </form>
+                            <form action="{{ url_for('delete_collection', c_id=c.id) }}" method="POST" class="d-inline float-end" onsubmit="return confirm('Видалити всю колекцію?');">
+                                <button class="btn btn-danger btn-sm">Видалити колекцію</button>
+                            </form>
+                        </div>
+
+                        {% if c.knowledges %}
+                            <div class="list-group">
+                            {% for k in c.knowledges %}
+                                <div class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div class="ms-2 me-auto">
+                                        <div class="fw-bold">{{ k.document.title }}</div>
+                                        {{ k.text|truncate(100) }}
+                                    </div>
+                                    <form action="{{ url_for('remove_from_collection', c_id=c.id, k_id=k.id) }}" method="POST">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Прибрати з колекції">x</button>
+                                    </form>
+                                </div>
+                            {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted">Колекція порожня.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+    textarea.auto-resize {
+        resize: none; /* Вимикаємо ручне розтягування */
+        overflow-y: hidden; /* Ховаємо скролбар */
+        min-height: 80px;
     }
+</style>
 
-    selectAll.addEventListener('change', function() {
-        checkboxes.forEach(cb => cb.checked = this.checked);
-        updateButtons();
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const textareas = document.querySelectorAll("textarea.auto-resize");
+
+        function resize(el) {
+            el.style.height = "auto";
+            el.style.height = (el.scrollHeight) + "px";
+        }
+
+        textareas.forEach(tx => {
+            // Налаштовуємо висоту при завантаженні (якщо є текст)
+            // Використовуємо setTimeout, щоб модальне вікно встигло відрендеритись
+            tx.addEventListener("input", () => resize(tx));
+        });
+
+        // Коли модальне вікно відкривається, перераховуємо висоту
+        var modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            modal.addEventListener('shown.bs.modal', function () {
+                const txs = modal.querySelectorAll('textarea.auto-resize');
+                txs.forEach(tx => resize(tx));
+            });
+        });
     });
-
-    checkboxes.forEach(cb => cb.addEventListener('change', updateButtons));
-
-    updateButtons();
-});
 </script>
 {% endblock %}
