@@ -2,6 +2,9 @@
 {% block title %}{{ doc.title }}{% endblock %}
 
 {% block content %}
+<script src="https://unpkg.com/jszip/dist/jszip.min.js"></script>
+<script src="https://unpkg.com/docx-preview/dist/docx-preview.min.js"></script>
+
 <div class="row">
     <div class="col-md-4 mb-4">
         <div class="card shadow-sm sticky-top" style="top: 20px; z-index: 1;">
@@ -21,6 +24,10 @@
                 </ul>
 
                 <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#previewModal">
+                        <i class="bi bi-eye"></i> Переглянути файл
+                    </button>
+
                     <a href="{{ url_for('download_document', doc_id=doc.id) }}" class="btn btn-outline-primary">
                         <i class="bi bi-download"></i> Завантажити файл
                     </a>
@@ -41,28 +48,50 @@
     <div class="col-md-8">
         
         <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-eye"></i> Перегляд документу</span>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#previewModal">
+                    <i class="bi bi-arrows-fullscreen"></i> На весь екран
+                </button>
+            </div>
+            <div class="card-body p-0 bg-light">
+                {% if doc.stored_filename.lower().endswith('.pdf') %}
+                    <div class="ratio ratio-4x3" style="min-height: 500px;">
+                        <iframe src="{{ url_for('view_document_file', doc_id=doc.id) }}" allowfullscreen></iframe>
+                    </div>
+                {% elif doc.stored_filename.lower().endswith('.docx') %}
+                    <div id="docx-inline-container" class="bg-white" style="min-height: 500px; max-height: 600px; overflow-y: auto;">
+                        <div class="d-flex justify-content-center align-items-center h-100 text-muted p-5">
+                            <div class="spinner-border me-2" role="status"></div> Завантаження попереднього перегляду...
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="p-5 text-center text-muted">
+                        <i class="bi bi-file-earmark-x fs-1"></i>
+                        <p class="mt-2">Перегляд для цього типу файлу недоступний.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        <div class="card shadow-sm mb-4">
             <div class="card-header bg-primary text-white">
                 <i class="bi bi-plus-circle"></i> Додати новий конспект
             </div>
             <div class="card-body">
                 <form action="{{ url_for('add_knowledge', doc_id=doc.id) }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    
                     <div class="mb-3">
                         <label class="form-label text-muted small">Цитата або фрагмент тексту *</label>
                         <textarea name="text" class="form-control auto-resize" placeholder="Вставте сюди текст із документу..." required></textarea>
                     </div>
-                    
                     <div class="mb-3">
                         <label class="form-label text-muted small">Ваша анотація / коментар</label>
                         <textarea name="note" class="form-control auto-resize" placeholder="Ваші думки щодо цього фрагменту..."></textarea>
                     </div>
-                    
                     <div class="mb-3">
                         <label class="form-label text-muted small">Теги</label>
                         <input type="text" name="tags" class="form-control" placeholder="напр. вступ, методологія, важливо">
                     </div>
-
                     <div class="d-flex justify-content-end">
                         <button type="submit" class="btn btn-success">
                             <i class="bi bi-save"></i> Зберегти конспект
@@ -99,17 +128,12 @@
                                 </ul>
                             </div>
                         </div>
-
-                        <blockquote class="blockquote fs-6">
-                            {{ k.text }}
-                        </blockquote>
-
+                        <blockquote class="blockquote fs-6">{{ k.text }}</blockquote>
                         {% if k.note %}
                             <div class="alert alert-light border mb-0 p-2 small">
                                 <i class="bi bi-chat-left-text me-2"></i> <strong>Примітка:</strong> {{ k.note }}
                             </div>
                         {% endif %}
-                        
                         <div class="d-flex justify-content-between align-items-center mt-3">
                             <div>
                                 {% if k.tags %}
@@ -164,6 +188,35 @@
     </div>
 </div>
 
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-fullscreen"> 
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-file-text"></i> {{ doc.original_filename }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0 bg-light text-center">
+        {% if doc.stored_filename.lower().endswith('.pdf') %}
+            <iframe src="{{ url_for('view_document_file', doc_id=doc.id) }}" style="width: 100%; height: 100%; border: none;"></iframe>
+        {% elif doc.stored_filename.lower().endswith('.docx') %}
+            <div id="docx-modal-container" class="bg-white h-100 w-100" style="overflow-y: auto;">
+                <div class="d-flex justify-content-center align-items-center h-100 text-muted">
+                    <div class="spinner-border me-2" role="status"></div> Завантаження...
+                </div>
+            </div>
+        {% else %}
+            <div class="d-flex align-items-center justify-content-center h-100">
+                <div class="text-muted">
+                    <i class="bi bi-eye-slash display-1"></i>
+                    <p class="mt-3 fs-4">Попередній перегляд недоступний</p>
+                </div>
+            </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -186,39 +239,74 @@
 </div>
 
 <style>
-    /* Стилі для авто-висоти текстового поля */
-    textarea.auto-resize {
-        resize: none;
-        overflow-y: hidden;
-        min-height: 80px;
-        transition: height 0.1s ease-out;
-    }
+    textarea.auto-resize { resize: none; overflow-y: hidden; min-height: 80px; transition: height 0.1s ease-out; }
+    /* Стилі для docx-preview, щоб виглядало як сторінка */
+    .docx-wrapper { background: #f8f9fa !important; padding: 20px !important; }
+    .docx-wrapper > section.docx { box-shadow: 0 0 10px rgba(0,0,0,0.1) !important; margin-bottom: 20px !important; }
 </style>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Логіка для авто-зміни висоти textarea
-        const textareas = document.querySelectorAll("textarea.auto-resize");
+        // --- ЛОГІКА РЕНДЕРУ DOCX ---
+        var docUrl = "{{ url_for('view_document_file', doc_id=doc.id) }}";
+        var isDocx = {{ 'true' if doc.stored_filename.lower().endswith('.docx') else 'false' }};
 
+        if (isDocx) {
+            // 1. Рендеримо в INLINE контейнер одразу при завантаженні сторінки
+            fetch(docUrl).then(res => res.blob()).then(blob => {
+                var inlineContainer = document.getElementById("docx-inline-container");
+                if (inlineContainer) {
+                    // Очищаємо спінер
+                    inlineContainer.innerHTML = "";
+                    // renderAsync(blob, element, null, options)
+                    docx.renderAsync(blob, inlineContainer, null, { 
+                        inWrapper: true, 
+                        ignoreWidth: false,
+                        className: "docx"
+                    }).then(x => console.log("Inline DOCX rendered"));
+                }
+            }).catch(err => {
+                console.error(err);
+                var c = document.getElementById("docx-inline-container");
+                if(c) c.innerHTML = "<div class='p-4 text-danger'>Помилка завантаження документу</div>";
+            });
+
+            // 2. Рендеримо в MODAL контейнер, коли відкривається модалка
+            var modal = document.getElementById('previewModal');
+            var modalContainer = document.getElementById("docx-modal-container");
+            var modalRendered = false; // Прапорець, щоб не рендерити двічі
+
+            modal.addEventListener('shown.bs.modal', function () {
+                if (!modalRendered && modalContainer) {
+                    fetch(docUrl).then(res => res.blob()).then(blob => {
+                        modalContainer.innerHTML = "";
+                        docx.renderAsync(blob, modalContainer, null, { 
+                            inWrapper: true,
+                            ignoreWidth: false 
+                        }).then(() => {
+                            modalRendered = true;
+                        });
+                    });
+                }
+            });
+        }
+
+        // --- ІНШІ СКРИПТИ (TEXTAREA, DELETE) ---
+        const textareas = document.querySelectorAll("textarea.auto-resize");
         function resize(el) {
             el.style.height = "auto"; 
             el.style.height = (el.scrollHeight) + "px"; 
         }
-
         textareas.forEach(tx => {
             tx.addEventListener("input", () => resize(tx));
             resize(tx);
         });
-
-        // Виправляємо висоту при відкритті модалки
         var modals = document.querySelectorAll('.modal');
         modals.forEach(modal => {
             modal.addEventListener('shown.bs.modal', function () {
                 modal.querySelectorAll('textarea.auto-resize').forEach(tx => resize(tx));
             });
         });
-
-        // Функція виклику модалки видалення
         window.confirmDelete = function(url) {
             const form = document.getElementById('deleteConfirmForm');
             form.action = url;
