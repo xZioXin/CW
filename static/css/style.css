@@ -8,9 +8,23 @@ body {
     font-family: 'Segoe UI', sans-serif;
 }
 
+/* --- Вирівнювання зліва --- */
+.card-body, 
+.form-group, 
+.form-label, 
+label, 
+.h1, .h2, .h3, .h4, .h5, .h6, h1, h2, h3, h4, h5, h6 {
+    text-align: left !important;
+}
+
+.text-center-forced {
+    text-align: center !important;
+}
+
+/* --- Стилі карток та ефектів --- */
 .hover-shadow:hover {
     transform: translateY(-4px);
-    box-shadow: var(--hover-shadow);
+    box-shadow: var(--hover-shadow) !important;
     transition: all 0.3s ease;
 }
 
@@ -38,6 +52,7 @@ blockquote {
     padding-left: 1rem;
     margin-left: 0;
     font-style: italic;
+    text-align: left;
 }
 
 .badge {
@@ -46,4 +61,36 @@ blockquote {
 
 .sticky-top {
     top: 100px;
+}
+
+/* --- Стилі, перенесені з HTML --- */
+.text-truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.5em; 
+}
+
+.transition-card {
+    transition: all 0.2s ease-in-out;
+}
+
+.smaller {
+    font-size: 0.85em;
+}
+
+.badge-xs {
+    font-size: 0.7em;
+}
+
+textarea.auto-resize {
+    resize: none;
+    overflow-y: hidden;
+    min-height: 80px;
+}
+
+.collection-name-input {
+    width: 150px;
 }

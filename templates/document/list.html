@@ -73,24 +73,47 @@
                         </h5>
                     </div>
                     
-                    <h6 class="card-subtitle mb-3 text-muted small">{{ doc.authors|truncate(50) }}</h6>
-
                     <ul class="list-unstyled small mb-4 flex-grow-1">
+                        <li class="mb-1 d-flex justify-content-between">
+                            <span class="text-muted">Автор:</span>
+                            <span class="text-end text-truncate" style="max-width: 60%;" title="{{ doc.authors }}">
+                                {{ doc.authors }}
+                            </span>
+                        </li>
+
                         <li class="mb-1 d-flex justify-content-between">
                             <span class="text-muted">Рік:</span>
                             <span class="fw-bold">{{ doc.year if doc.year else '—' }}</span>
                         </li>
+
                         <li class="mb-1 d-flex justify-content-between">
                             <span class="text-muted">Тип:</span>
                             <span class="badge bg-info text-dark">{{ doc.doc_type }}</span>
                         </li>
+                        
                         {% if doc.source %}
-                        <li class="mb-1 text-truncate">
-                            <span class="text-muted">Джерело:</span> {{ doc.source }}
+                        <li class="mb-1 d-flex justify-content-between">
+                            <span class="text-muted">Джерело:</span> 
+                            <span class="text-end text-truncate" style="max-width: 60%;" title="{{ doc.source }}">
+                                {{ doc.source }}
+                            </span>
                         </li>
                         {% endif %}
-                        <li class="mt-2 pt-2 border-top text-muted smaller">
-                            <i class="bi bi-calendar3"></i> Додано: {{ doc.uploaded_at.strftime('%d.%m.%Y') }}
+                        
+                        <li class="mt-2 pt-2 border-top text-muted smaller d-flex justify-content-between align-items-center">
+                            <span title="Дата завантаження">
+                                <i class="bi bi-calendar3"></i> {{ doc.uploaded_at.strftime('%d.%m.%Y') }}
+                            </span>
+                            
+                            <span class="text-truncate" style="max-width: 120px;" 
+                                  title="Завантажив: {% if current_user.is_authenticated and doc.uploaded_by == current_user.id %}Ви{% else %}{{ doc.user.name }}{% endif %}">
+                                <i class="bi bi-person"></i> 
+                                {% if current_user.is_authenticated and doc.uploaded_by == current_user.id %}
+                                    <strong>Ви</strong>
+                                {% else %}
+                                    {{ doc.user.name }}
+                                {% endif %}
+                            </span>
                         </li>
                     </ul>
 
@@ -115,7 +138,6 @@
 {% endif %}
 
 <style>
-    /* Стиль для обмеження кількості рядків заголовка */
     .text-truncate-3 {
         display: -webkit-box;
         -webkit-line-clamp: 2;
@@ -124,7 +146,6 @@
         min-height: 2.5em; 
     }
     
-    /* Ефект при наведенні */
     .hover-shadow:hover {
         transform: translateY(-3px);
         box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;

@@ -341,6 +341,37 @@
                 orderedInput.value = selectedOrder.join(',');
             });
         });
+
+        // --- ЗБЕРЕЖЕННЯ СТАНУ АКОРДЕОНА (НОВИЙ КОД) ---
+        // Цей код відновлює відкриту колекцію після перезавантаження сторінки
+        const accordion = document.getElementById('accordionCollections');
+        const storageKey = 'knowledge_opened_collection';
+
+        if (accordion) {
+            // 1. Відновлення стану при завантаженні
+            const savedId = localStorage.getItem(storageKey);
+            if (savedId) {
+                const el = document.getElementById(savedId);
+                // Перевіряємо, чи елемент все ще існує (можливо його видалили)
+                if (el) {
+                    // Використовуємо Bootstrap API щоб відкрити без анімації
+                    const bsCollapse = new bootstrap.Collapse(el, { toggle: false });
+                    bsCollapse.show();
+                }
+            }
+
+            // 2. Збереження ID при відкритті будь-якої секції
+            accordion.addEventListener('shown.bs.collapse', function (e) {
+                localStorage.setItem(storageKey, e.target.id);
+            });
+
+            // 3. Очищення при закритті (якщо користувач сам закрив ту саму секцію)
+            accordion.addEventListener('hidden.bs.collapse', function (e) {
+                if (localStorage.getItem(storageKey) === e.target.id) {
+                    localStorage.removeItem(storageKey);
+                }
+            });
+        }
     });
 
     function confirmDelete(url) {
