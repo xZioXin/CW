@@ -1,33 +1,35 @@
 import os
 import uuid  
-import tempfile                             
 from werkzeug.utils import secure_filename
 from flask import Flask, render_template, redirect, url_for, flash, request, send_from_directory, abort, send_file
 from flask_login import login_user, logout_user, login_required, current_user
 from datetime import datetime
 
 from docx import Document as DocxDoc
-from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 
 from config import Config
 from models import db, User, Document, Knowledge, Collection, CollectionItem, RecentlyViewed
-from forms import RegistrationForm, LoginForm, DocumentForm, DocumentEditForm, KnowledgeForm, CollectionForm
+from forms import RegistrationForm, LoginForm, DocumentForm, DocumentEditForm
 from utils import init_search_index, search_fulltext, index_document, delete_document_from_index, backup_database
 
 def create_app():
+    # Ініціалізація додатку та завантаження конфігурації
     app = Flask(__name__)
     app.config.from_object(Config)
 
+    # Створюємо потрібні папки, якщо їх немає
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs('backups', exist_ok=True)
     os.makedirs(app.instance_path, exist_ok=True)
 
+    # Підключаємо базу даних та захист від CSRF атак
     db.init_app(app)
     from flask_wtf.csrf import CSRFProtect
-    csrf = CSRFProtect(app)
+    CSRFProtect(app)
 
+    # Налаштовуємо систему входу користувачів
     from flask_login import LoginManager
     login_manager = LoginManager(app)
     login_manager.login_view = 'login'
@@ -38,6 +40,7 @@ def create_app():
     def load_user(user_id):
         return User.query.get(int(user_id))
 
+    # Ця функція додає список "Нещодавно переглянутих" на кожну сторінку
     @app.context_processor
     def inject_recent():
         if current_user.is_authenticated:
@@ -56,13 +59,14 @@ def create_app():
     with app.app_context():
         db.create_all()
         init_search_index()
+        # Створюємо адміна за замовчуванням, якщо його немає
         if not User.query.filter_by(email='admin@example.com').first():
             admin = User(email='admin@example.com', name='Адміністратор системи', role='admin', is_active=True)
             admin.set_password('admin123')
             db.session.add(admin)
             db.session.commit()
 
-    # === Основні маршрути ===
+    # === Основні сторінки ===
     @app.route('/')
     def index():
         recent_uploads = Document.query.order_by(Document.uploaded_at.desc()).limit(10).all()
@@ -89,8 +93,8 @@ def create_app():
             user = User.query.filter_by(email=form.email.data).first()
             if user and user.check_password(form.password.data) and user.is_active:
                 login_user(user, remember=True)
-                next = request.args.get('next')
-                return redirect(next) if next else redirect(url_for('index'))
+                next_page = request.args.get('next')
+                return redirect(next_page) if next_page else redirect(url_for('index'))
             flash('Невірний логін або пароль', 'danger')
         return render_template('auth/login.html', form=form)
 
@@ -101,7 +105,7 @@ def create_app():
         flash('Ви вийшли з системи', 'info')
         return redirect(url_for('index'))
 
-    # === Документи ===
+    # === Робота з документами ===
     @app.route('/document/upload', methods=['GET', 'POST'])
     @login_required
     def upload_document():
@@ -113,9 +117,12 @@ def create_app():
             if ext not in ['.pdf', '.docx']:
                 flash('Тільки PDF та DOCX', 'danger')
                 return redirect(request.url)
+            
+            # Генеруємо унікальне ім'я файлу, щоб уникнути конфліктів
             unique_filename = str(uuid.uuid4()) + ext
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             f.save(filepath)
+            
             doc = Document(
                 title=form.title.data, authors=form.authors.data, year=form.year.data,
                 source=form.source.data, doc_type=form.doc_type.data,
@@ -124,6 +131,8 @@ def create_app():
             )
             db.session.add(doc)
             db.session.commit()
+            
+            # Одразу додаємо в пошуковий індекс
             index_document(doc.id, filepath)
             flash('Документ завантажено!', 'success')
             return redirect(url_for('document_list'))
@@ -133,10 +142,13 @@ def create_app():
     @login_required
     def edit_document(doc_id):
         doc = Document.query.get_or_404(doc_id)
+        # Редагувати може тільки власник або адмін
         if current_user.role != 'admin' and doc.uploaded_by != current_user.id: abort(403)
+        
         form = DocumentEditForm(obj=doc)
         if form.validate_on_submit():
             form.populate_obj(doc)
+            # Якщо завантажили новий файл - замінюємо старий
             if form.file.data:
                 f = form.file.data
                 ext = os.path.splitext(f.filename)[1].lower()
@@ -146,6 +158,7 @@ def create_app():
                 except: pass
                 doc.stored_filename = new_filename
                 doc.original_filename = f.filename
+            
             db.session.commit()
             index_document(doc.id, os.path.join(app.config['UPLOAD_FOLDER'], doc.stored_filename))
             flash('Документ оновлено', 'success')
@@ -157,11 +170,15 @@ def create_app():
     def delete_document(doc_id):
         doc = Document.query.get_or_404(doc_id)
         if current_user.role != 'admin' and doc.uploaded_by != current_user.id: abort(403)
+        
         delete_document_from_index(doc.id)
         try: os.remove(os.path.join(app.config['UPLOAD_FOLDER'], doc.stored_filename))
         except: pass
+        
+        # Видаляємо пов'язані дані
         Knowledge.query.filter_by(document_id=doc.id).delete()
         RecentlyViewed.query.filter_by(document_id=doc.id).delete()
+        
         db.session.delete(doc)
         db.session.commit()
         flash('Документ видалено', 'success')
@@ -170,6 +187,7 @@ def create_app():
     @app.route('/documents')
     @login_required
     def document_list():
+        # Зчитуємо параметри фільтрації з URL
         query = request.args.get('q', '').strip()
         author = request.args.get('author', '')
         year_from = request.args.get('year_from', type=int)
@@ -178,9 +196,13 @@ def create_app():
         show_my = request.args.get('show_my')
 
         docs = Document.query
+        
+        # Повнотекстовий пошук
         if query:
             ids = search_fulltext(query)
             docs = docs.filter(Document.id.in_(ids)) if ids else docs.filter(False)
+        
+        # Звичайні фільтри
         if author: docs = docs.filter(Document.authors.ilike(f'%{author}%'))
         if year_from: docs = docs.filter(Document.year >= year_from)
         if year_to: docs = docs.filter(Document.year <= year_to)
@@ -194,9 +216,11 @@ def create_app():
     @login_required
     def document_detail(doc_id):
         doc = Document.query.get_or_404(doc_id)
+        # Фіксуємо перегляд в історії
         view = RecentlyViewed(user_id=current_user.id, document_id=doc_id)
         db.session.add(view)
         db.session.commit()
+        
         knowledges = Knowledge.query.filter_by(document_id=doc_id, user_id=current_user.id).all()
         return render_template('document/detail.html', doc=doc, knowledges=knowledges)
 
@@ -207,7 +231,7 @@ def create_app():
         return send_from_directory(app.config['UPLOAD_FOLDER'], doc.stored_filename,
                                    as_attachment=True, download_name=doc.original_filename)
 
-    # === Знання та Колекції ===
+    # === Знання, Нотатки та Колекції ===
     @app.route('/knowledge/add/<int:doc_id>', methods=['POST'])
     @login_required
     def add_knowledge(doc_id):
@@ -237,11 +261,8 @@ def create_app():
         else:
             flash('Текст не може бути пустим', 'danger')
         
-        # Повертаємось туди, звідки прийшли (якщо передано параметр next)
         next_page = request.args.get('next')
-        if next_page:
-            return redirect(next_page)
-            
+        if next_page: return redirect(next_page)
         return redirect(url_for('my_knowledge'))
 
     @app.route('/knowledge/<int:k_id>/delete', methods=['POST'])
@@ -253,85 +274,71 @@ def create_app():
         db.session.commit()
         flash('Конспект видалено', 'success')
         
-        # Повертаємось туди, звідки прийшли (якщо передано параметр next)
         next_page = request.args.get('next')
-        if next_page:
-            return redirect(next_page)
-
+        if next_page: return redirect(next_page)
         return redirect(url_for('my_knowledge'))
 
     @app.route('/my/knowledge', methods=['GET', 'POST'])
     @login_required
     def my_knowledge():
-        # --- Параметри для вкладки "Конспекти" ---
+        # Отримуємо параметри для фільтрації та сортування
         q = request.args.get('q', '').strip()
         tag = request.args.get('tag', '').strip()
         filter_doc = request.args.get('filter_doc', type=int)
         filter_col = request.args.get('filter_col', type=int)
-        sort_by = request.args.get('sort_by', 'date_desc') # date_desc, date_asc, doc_title
+        sort_by = request.args.get('sort_by', 'date_desc')
 
-        # --- Параметри для вкладки "Колекції" ---
-        col_q = request.args.get('col_q', '').strip() # Пошук по назві
-        col_item_q = request.args.get('col_item_q', '').strip() # Пошук колекцій, що містять текст
-        col_sort = request.args.get('col_sort', 'name_asc') # name_asc, count_desc
+        col_q = request.args.get('col_q', '').strip()
+        col_item_q = request.args.get('col_item_q', '').strip()
+        col_sort = request.args.get('col_sort', 'name_asc')
 
-        active_tab = request.args.get('tab', 'all') # 'all' or 'collections'
+        active_tab = request.args.get('tab', 'all')
 
-        # === 1. ЗАПИТ КОНСПЕКТІВ ===
+        # --- Формуємо запит для конспектів ---
         query = Knowledge.query.filter_by(user_id=current_user.id)
         
         if q:
             query = query.filter( (Knowledge.text.ilike(f'%{q}%')) | (Knowledge.note.ilike(f'%{q}%')) )
         if tag:
             query = query.filter(Knowledge.tags.ilike(f'%{tag}%'))
-        
-        # Фільтр по документу (статті)
         if filter_doc:
             query = query.filter_by(document_id=filter_doc)
-            
-        # Фільтр по колекції (join з CollectionItem)
         if filter_col:
             query = query.join(Knowledge.collection_items).filter(CollectionItem.collection_id == filter_col)
 
-        # Сортування конспектів
         if sort_by == 'doc_title':
             query = query.join(Document).order_by(Document.title.asc())
         elif sort_by == 'date_asc':
             query = query.order_by(Knowledge.created_at.asc())
-        else: # date_desc
+        else:
             query = query.order_by(Knowledge.created_at.desc())
 
         knowledges = query.all()
 
-        # === 2. ЗАПИТ КОЛЕКЦІЙ ===
+        # --- Формуємо запит для колекцій ---
         c_query = Collection.query.filter_by(user_id=current_user.id)
-
-        # Пошук по назві колекції
         if col_q:
             c_query = c_query.filter(Collection.name.ilike(f'%{col_q}%'))
-        
-        # Пошук колекцій, які містять певні конспекти (по тексту або нотатці)
         if col_item_q:
             c_query = c_query.join(Collection.items).join(CollectionItem.knowledge)\
                              .filter( (Knowledge.text.ilike(f'%{col_item_q}%')) | (Knowledge.note.ilike(f'%{col_item_q}%')) )
 
         collections_list = c_query.all()
         
-        # Сортування колекцій (Python-рівень для зручності count)
+        # Сортуємо колекції (вручну, бо це простіше для підрахунку кількості елементів)
         if col_sort == 'count_desc':
             collections_list.sort(key=lambda c: len(c.items), reverse=True)
         elif col_sort == 'count_asc':
             collections_list.sort(key=lambda c: len(c.items), reverse=False)
         elif col_sort == 'name_desc':
             collections_list.sort(key=lambda c: c.name.lower(), reverse=True)
-        else: # name_asc
+        else:
             collections_list.sort(key=lambda c: c.name.lower())
 
-        # Для випадаючих списків фільтрів
         all_docs = Document.query.join(Knowledge).filter(Knowledge.user_id==current_user.id).distinct().all()
         all_cols = Collection.query.filter_by(user_id=current_user.id).order_by(Collection.name).all()
 
-        # === POST ACTIONS ===
+        # Обробка дій (експорт у Word або додавання в колекцію)
         if request.method == 'POST':
             action = request.form.get('action')
             
@@ -342,6 +349,7 @@ def create_app():
                     flash('Нічого не вибрано', 'warning')
                     return redirect(url_for('my_knowledge'))
                 
+                # Зберігаємо порядок, в якому користувач вибирав елементи
                 final_ids = []
                 if ordered_ids_str:
                     click_order = ordered_ids_str.split(',')
@@ -356,6 +364,7 @@ def create_app():
                 k_map = {k.id: k for k in k_objects}
                 sorted_knowledge = [k_map[fid] for fid in final_ids if fid in k_map]
 
+                # Генерація DOCX файлу
                 doc = DocxDoc()
                 doc.add_heading('Експортовані конспекти', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
                 for i, k in enumerate(sorted_knowledge, 1):
@@ -462,7 +471,7 @@ def create_app():
         return send_file(buffer, as_attachment=True, download_name=f"{secure_filename(c.name)}.docx",
                          mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
 
-    # === Адмінка ===
+    # === Панель адміністратора ===
     @app.route('/admin/users')
     @login_required
     def admin_users():

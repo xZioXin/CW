@@ -3,6 +3,7 @@ from flask_wtf.file import FileField, FileRequired, FileAllowed
 from wtforms import StringField, PasswordField, SubmitField, TextAreaField, IntegerField, SelectField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, Optional
 
+# Форма реєстрації нового користувача
 class RegistrationForm(FlaskForm):
     name = StringField('ПІБ', validators=[DataRequired(), Length(min=2, max=100)])
     email = StringField('Email', validators=[DataRequired(), Email()])
@@ -11,11 +12,13 @@ class RegistrationForm(FlaskForm):
                                      validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('Зареєструватися')
 
+# Форма входу
 class LoginForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
     password = PasswordField('Пароль', validators=[DataRequired()])
     submit = SubmitField('Увійти')
 
+# Форма завантаження нового документу
 class DocumentForm(FlaskForm):
     title = StringField('Назва документу', validators=[DataRequired()])
     authors = StringField('Автори', validators=[DataRequired()])
@@ -34,18 +37,21 @@ class DocumentForm(FlaskForm):
     ])
     submit = SubmitField('Завантажити')
 
+# Форма редагування документу (файл необов'язковий)
 class DocumentEditForm(DocumentForm):
     file = FileField('Оновити файл (залиште пустим, якщо не змінюєте)', validators=[
         FileAllowed(['pdf', 'docx'], 'Тільки PDF та DOCX!')
     ])
     submit = SubmitField('Зберегти зміни')
 
+# Форма для створення нотатки (конспекту)
 class KnowledgeForm(FlaskForm):
     text = TextAreaField('Виділений фрагмент / цитата', validators=[DataRequired()])
     note = TextAreaField('Ваша анотація / коментар', validators=[Optional()])
     tags = StringField('Теги (через кому)')
     submit = SubmitField('Зберегти')
 
+# Форма створення колекції
 class CollectionForm(FlaskForm):
     name = StringField('Назва колекції', validators=[DataRequired()])
     submit = SubmitField('Зберегти')

@@ -7,10 +7,10 @@ from whoosh.fields import Schema, TEXT, ID, DATETIME, KEYWORD
 import PyPDF2
 from docx import Document as DocxDocument
 from bleach import clean
-from models import db, Document
-from config import Config
+from models import Document
 from flask import current_app
 
+# Описуємо, які поля будемо шукати
 def get_schema():
     return Schema(
         doc_id=ID(stored=True, unique=True),
@@ -21,12 +21,14 @@ def get_schema():
         tags=KEYWORD(lowercase=True, commas=True)
     )
 
+# Створюємо папку для індексу пошуку, якщо її немає
 def init_search_index():
     if not os.path.exists(current_app.config['WHOOSH_BASE']):
         os.mkdir(current_app.config['WHOOSH_BASE'])
         ix = create_in(current_app.config['WHOOSH_BASE'], schema=get_schema())
         ix.close()
 
+# Витягуємо чистий текст із PDF або DOCX
 def extract_text(filepath):
     text = ""
     ext = os.path.splitext(filepath)[1].lower()
@@ -44,8 +46,11 @@ def extract_text(filepath):
                 text += para.text + "\n"
     except Exception as e:
         print(f"Помилка читання файлу {filepath}: {e}")
+    
+    # Чистимо текст від зайвих тегів та обмежуємо довжину
     return clean(text, tags=[], strip=True)[:900000]
 
+# Додаємо або оновлюємо документ у пошуковому індексі
 def index_document(doc_id, filepath):
     ix = open_dir(current_app.config['WHOOSH_BASE'])
     writer = ix.writer()
@@ -70,8 +75,8 @@ def index_document(doc_id, filepath):
     )
     writer.commit()
 
+# Видаляємо документ з пошуку
 def delete_document_from_index(doc_id):
-    """Видаляє документ із пошукового індексу Whoosh"""
     if not os.path.exists(current_app.config['WHOOSH_BASE']):
         return
     ix = open_dir(current_app.config['WHOOSH_BASE'])
@@ -79,16 +84,19 @@ def delete_document_from_index(doc_id):
     writer.delete_by_term('doc_id', str(doc_id))
     writer.commit()
 
+# Виконуємо пошук по індексу
 def search_fulltext(query_str, limit=100):
     if not query_str.strip():
         return []
     ix = open_dir(current_app.config['WHOOSH_BASE'])
     with ix.searcher() as searcher:
+        # Шукаємо по назві, вмісту та авторам (АБО там, АБО там)
         parser = MultifieldParser(["title", "content", "authors"], ix.schema, group=OrGroup)
         query = parser.parse(query_str)
         results = searcher.search(query, limit=limit)
         return [int(r['doc_id']) for r in results]
 
+# Робимо резервну копію бази даних
 def backup_database():
     backup_dir = "backups"
     os.makedirs(backup_dir, exist_ok=True)

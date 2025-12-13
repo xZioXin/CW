@@ -5,7 +5,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
-# Оновлена модель зв'язку
+# Таблиця для зв'язку "багато-до-багатьох" між колекціями та нотатками
 class CollectionItem(db.Model):
     __tablename__ = 'collection_item'
     id = db.Column(db.Integer, primary_key=True)
@@ -16,6 +16,7 @@ class CollectionItem(db.Model):
     collection = db.relationship("Collection", back_populates="items")
     knowledge = db.relationship("Knowledge", back_populates="collection_items")
 
+# Користувачі системи
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -31,6 +32,7 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+# Завантажені документи (статті, книги тощо)
 class Document(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(300), nullable=False)
@@ -45,6 +47,7 @@ class Document(db.Model):
 
     user = db.relationship('User', backref='documents')
 
+# Конспекти (нотатки), які користувач робить до документів
 class Knowledge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     document_id = db.Column(db.Integer, db.ForeignKey('document.id'))
@@ -58,6 +61,7 @@ class Knowledge(db.Model):
     user = db.relationship('User', backref='knowledges')
     collection_items = db.relationship('CollectionItem', back_populates='knowledge', cascade="all, delete-orphan")
 
+# Колекції (папки) для групування конспектів
 class Collection(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(150), nullable=False)
@@ -68,6 +72,7 @@ class Collection(db.Model):
     items = db.relationship('CollectionItem', back_populates='collection', 
                             order_by='CollectionItem.created_at', cascade="all, delete-orphan")
 
+# Історія переглядів документів
 class RecentlyViewed(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
