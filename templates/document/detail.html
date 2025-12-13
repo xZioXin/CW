@@ -26,6 +26,7 @@
                         <i class="bi bi-pencil"></i> Редагувати
                     </a>
                     <form action="{{ url_for('delete_document', doc_id=doc.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Ви впевнені, що хочете видалити цей документ? Цю дію не можна скасувати.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <button type="submit" class="btn btn-danger btn-sm">
                             <i class="bi bi-trash"></i> Видалити
                         </button>
@@ -41,6 +42,8 @@
             </div>
             <div class="card-body">
                 <form method="POST" action="{{ url_for('add_knowledge', doc_id=doc.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
                     <div class="mb-3">
                         <label class="form-label">Виділений текст (цитата)</label>
                         <textarea name="text" class="form-control" rows="4" required 

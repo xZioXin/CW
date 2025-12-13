@@ -43,6 +43,7 @@
                             <td>
                                 {% if user.id != current_user.id %}
                                     <form method="POST" action="{{ url_for('toggle_user', user_id=user.id) }}" class="d-inline">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-sm {% if user.is_active %}btn-warning{% else %}btn-success{% endif %}">
                                             {% if user.is_active %}Заблокувати{% else %}Розблокувати{% endif %}
                                         </button>

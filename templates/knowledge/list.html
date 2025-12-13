@@ -34,6 +34,7 @@
     <div class="tab-pane fade show active" id="all" role="tabpanel">
         
         <form method="POST" id="bulkForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="ordered_ids" id="ordered_ids">
             
             <div class="d-flex flex-wrap align-items-center mb-3 p-2 bg-light rounded gap-2">
@@ -102,7 +103,7 @@
                         <div class="modal-dialog">
                             <div class="modal-content">
                                 <form action="{{ url_for('edit_knowledge', k_id=k.id) }}" method="POST">
-                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token else '' }}">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     
                                     <div class="modal-header">
                                         <h5 class="modal-title">Редагувати конспект</h5>
@@ -140,6 +141,7 @@
 
     <div class="tab-pane fade" id="collections" role="tabpanel">
         <form action="{{ url_for('create_collection') }}" method="POST" class="row g-2 mb-4 align-items-center">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="col-auto">
                 <input type="text" name="name" class="form-control" placeholder="Назва нової колекції" required>
             </div>
@@ -163,6 +165,7 @@
                                 <i class="bi bi-file-word"></i> DOCX
                             </a>
                             <form action="{{ url_for('rename_collection', c_id=c.id) }}" method="POST" class="d-inline-block me-2">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <div class="input-group input-group-sm">
                                     <input type="text" name="name" class="form-control" value="{{ c.name }}" style="width: 150px;">
                                     <button class="btn btn-outline-secondary" type="submit">Перейменувати</button>
@@ -182,6 +185,7 @@
                                         {{ k.text|truncate(100) }}
                                     </div>
                                     <form action="{{ url_for('remove_from_collection', c_id=c.id, k_id=k.id) }}" method="POST">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-sm btn-outline-danger" title="Прибрати з колекції">
                                             <i class="bi bi-x-lg"></i>
                                         </button>
@@ -214,6 +218,7 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Ні, скасувати</button>
                 <form id="deleteConfirmForm" method="POST" action="">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-danger">Так, видалити</button>
                 </form>
             </div>
