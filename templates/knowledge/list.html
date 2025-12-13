@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Мої знання{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Мої знання та конспекти</h2>
+
+<div class="row">
+    <!-- Ліва колонка — фрагменти -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Збережені фрагменти ({{ knowledges|length }})</h5>
+                <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createCollectionModal">
+                    Створити колекцію
+                </button>
+            </div>
+            <div class="card-body">
+                {% if knowledges %}
+                    {% for k in knowledges %}
+                        <div class="border-start border-primary border-4 ps-3 mb-4">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="knowledge_id" value="{{ k.id }}" id="k{{ k.id }}">
+                                <label class="form-check-label" for="k{{ k.id }}"></label>
+                            </div>
+
+                            <blockquote class="mb-2 fs-6">
+                                {{ k.text|truncate(400) }}
+                                {% if k.text|length > 400 %}
+                                    <a href="{{ url_for('document_detail', doc_id=k.document.id) }}" class="small">…далі</a>
+                                {% endif %}
+                            </blockquote>
+
+                            <p class="small text-muted mb-1">
+                                Джерело: 
+                                <a href="{{ url_for('document_detail', doc_id=k.document.id) }}">
+                                    {{ k.document.title }}
+                                </a>
+                                <span class="text-secondary"> • {{ k.document.authors }} ({{ k.document.year or '—' }})</span>
+                            </p>
+
+                            {% if k.note %}
+                                <p class="mb-2"><strong>Анотація:</strong> {{ k.note }}</p>
+                            {% endif %}
+
+                            {% if k.tags %}
+                                <div class="mb-2">
+                                    {% for tag in k.tags.split(',') %}
+                                        <span class="badge bg-light text-dark me-1">{{ tag.strip() }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+
+                            <small class="text-muted">
+                                Додано {{ k.created_at.strftime('%d.%m.%Y о %H:%M') }}
+                            </small>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center py-5">Ви ще не зберегли жодного фрагменту.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Права колонка — колекції + конспект -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Тематичні колекції</h5>
+            </div>
+            <div class="list-group list-group-flush">
+                {% if collections %}
+                    {% for coll in collections %}
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between">
+                                <span>{{ coll.name }}</span>
+                                <span class="badge bg-primary rounded-pill">0</span>
+                            </div>
+                        </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="list-group-item text-center text-muted py-4">
+                        Колекцій немає<br>
+                        <button class="btn btn-sm btn-outline-primary mt-2" data-bs-toggle="modal" data-bs-target="#createCollectionModal">
+                            Створити
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Формування конспекту -->
+        <div class="card shadow-sm">
+            <div class="card-body text-center">
+                <h5>Сформувати конспект</h5>
+                <button id="generateSummaryBtn" class="btn btn-success btn-lg w-100 mb-3" disabled>
+                    Сформувати конспект
+                </button>
+
+                <div id="exportButtons" class="d-none">
+                    <a id="docxLink" class="btn btn-outline-primary btn-sm w-100 mb-2">Word (.docx)</a>
+                    <a id="pdfLink" class="btn btn-outline-danger btn-sm w-100">PDF</a>
+                </div>
+
+                <div class="mt-3">
+                    <input type="checkbox" id="selectAll">
+                    <label for="selectAll" class="small text-muted">Позначити всі</label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальне вікно -->
+<div class="modal fade" id="createCollectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('create_collection') }}">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">Нова колекція</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" name="name" class="form-control form-control-lg" placeholder="Назва колекції" required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                    <button type="submit" class="btn btn-primary">Створити</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- JavaScript — повністю безпечний -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('input[name="knowledge_id"]');
+    const btn = document.getElementById('generateSummaryBtn');
+    const exportDiv = document.getElementById('exportButtons');
+
+    function updateButtons() {
+        const checked = document.querySelectorAll('input[name="knowledge_id"]:checked');
+        if (checked.length > 0) {
+            btn.disabled = false;
+            btn.textContent = `Сформувати конспект (${checked.length})`;
+
+            const ids = Array.from(checked).map(c => c.value).join(',');
+            document.getElementById('docxLink').href = `/knowledge/export/docx?ids=${ids}`;
+            document.getElementById('pdfLink').href = `/knowledge/export/pdf?ids=${ids}`;
+            exportDiv.classList.remove('d-none');
+        } else {
+            btn.disabled = true;
+            btn.textContent = 'Сформувати конспект';
+            exportDiv.classList.add('d-none');
+        }
+    }
+
+    selectAll.addEventListener('change', function() {
+        checkboxes.forEach(cb => cb.checked = this.checked);
+        updateButtons();
+    });
+
+    checkboxes.forEach(cb => cb.addEventListener('change', updateButtons));
+
+    updateButtons();
+});
+</script>
+{% endblock %}

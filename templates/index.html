@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Головна{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <h1 class="display-5 fw-bold text-primary mb-4">Система управління знаннями</h1>
+        <p class="lead mb-5">
+            Зберігайте наукові статті та аналітичні матеріали, виділяйте важливі фрагменти, 
+            створюйте конспекти та тематичні колекції.
+        </p>
+
+        {% if current_user.is_authenticated %}
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">Завантажити новий документ</h5>
+                            <p class="card-text">PDF або DOCX до 50 МБ</p>
+                            <a href="{{ url_for('upload_document') }}" class="btn btn-primary btn-lg">
+                                Завантажити
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">Мої знання та конспекти</h5>
+                            <p class="card-text">Ваші цитати, анотації та колекції</p>
+                            <a href="{{ url_for('my_knowledge') }}" class="btn btn-outline-primary btn-lg">
+                                Перейти
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="mt-5 mb-3">Останні додані документи</h3>
+            {% if recent %}
+                <div class="list-group">
+                {% for doc in recent %}
+                    <a href="{{ url_for('document_detail', doc_id=doc.id) }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ doc.title }}</h6>
+                            <small>{{ doc.uploaded_at.strftime('%d.%m.%Y') }}</small>
+                        </div>
+                        <p class="mb-1 text-muted">{{ doc.authors }} • {{ doc.year or '—' }}</p>
+                        <small class="text-muted">{{ doc.doc_type }}</small>
+                    </a>
+                {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted">Поки що немає документів у системі.</p>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <h3>Вітаємо у системі управління знаннями!</h3>
+                <p class="mt-4">
+                    <a href="{{ url_for('register') }}" class="btn btn-success btn-lg me-3">Зареєструватися</a>
+                    <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-lg">Увійти</a>
+                </p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

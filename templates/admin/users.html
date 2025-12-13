@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Керування користувачами{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10 mx-auto">
+        <h2 class="mb-4">Керування користувачами (Адміністратор)</h2>
+
+        <div class="card shadow">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>#</th>
+                            <th>ПІБ</th>
+                            <th>Email</th>
+                            <th>Роль</th>
+                            <th>Статус</th>
+                            <th>Дата реєстрації</th>
+                            <th>Дії</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td><strong>{{ user.name }}</strong></td>
+                            <td>{{ user.email }}</td>
+                            <td>
+                                <span class="badge bg-{% if user.role == 'admin' %}danger{% else %}primary{% endif %}">
+                                    {{ 'Адміністратор' if user.role == 'admin' else 'Користувач' }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if user.is_active %}
+                                    <span class="badge bg-success">Активний</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Заблокований</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('toggle_user', user_id=user.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-sm {% if user.is_active %}btn-warning{% else %}btn-success{% endif %}">
+                                        {% if user.is_active %}Заблокувати{% else %}Розблокувати{% endif %}
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

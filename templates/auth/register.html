@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Реєстрація{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7 col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white text-center py-4">
+                <h3 class="mb-0">Створити обліковий запис</h3>
+            </div>
+            <div class="card-body p-5">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control form-control-lg", placeholder="Іванов Іван Іванович") }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.email.label(class="form-label") }}
+                        {{ form.email(class="form-control form-control-lg", placeholder="ivanov@example.com") }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.password.label(class="form-label") }}
+                            {{ form.password(class="form-control form-control-lg", placeholder="Мінімум 6 символів") }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.confirm_password.label(class="form-label") }}
+                            {{ form.confirm_password(class="form-control form-control-lg") }}
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        {{ form.submit(class="btn btn-success btn-lg") }}
+                    </div>
+                </form>
+
+                <div class="text-center mt-4">
+                    <p class="mb-0">Вже є акаунт? <a href="{{ url_for('login') }}">Увійти</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.title }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-9">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">{{ doc.title }}</h4>
+                <a href="{{ url_for('download_document', doc_id=doc.id) }}" 
+                   class="btn btn-light btn-sm">Завантажити файл</a>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless">
+                    <tr><th width="150">Автори</th><td>{{ doc.authors }}</td></tr>
+                    <tr><th>Рік публікації</th><td>{{ doc.year or '—' }}</td></tr>
+                    <tr><th>Тип документу</th><td><span class="badge bg-secondary">{{ doc.doc_type }}</span></td></tr>
+                    <tr><th>Джерело</th><td>{{ doc.source or 'Не вказано' }}</td></tr>
+                    <tr><th>Завантажено</th><td>{{ doc.uploaded_at.strftime('%d.%m.%Y %H:%M') }} 
+                        користувачем {{ doc.user.name }}</td></tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Форма для виділення цитати та збереження як знання -->
+        <div class="card shadow mb-4">
+            <div class="card-header">
+                <h5>Додати цитату / фрагмент як знання</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_knowledge', doc_id=doc.id) }}">
+                    <div class="mb-3">
+                        <label class="form-label">Виділений текст (цитата)</label>
+                        <textarea name="text" class="form-control" rows="4" required 
+                                  placeholder="Вставте або напишіть текст фрагменту..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ваша анотація / коментар (необов'язково)</label>
+                        <textarea name="note" class="form-control" rows="3" 
+                                  placeholder="Чому цей фрагмент важливий для вас?"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Теги (через кому)</label>
+                        <input type="text" name="tags" class="form-control" 
+                               placeholder="теорія, машинне навчання, 2025">
+                    </div>
+                    <button type="submit" class="btn btn-success">Зберегти як знання</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Список вже збережених знань по цьому документу -->
+        <h4>Ваші збережені фрагменти з цього документу ({{ knowledges|length }})</h4>
+        {% if knowledges %}
+            {% for k in knowledges %}
+            <div class="card mb-3 border-start border-primary border-4">
+                <div class="card-body">
+                    <blockquote class="mb-2">{{ k.text }}</blockquote>
+                    {% if k.note %}
+                        <p class="text-muted"><strong>Ваша анотація:</strong> {{ k.note }}</p>
+                    {% endif %}
+                    {% if k.tags %}
+                        <p class="mb-0">
+                            {% for tag in k.tags.split(',') %}
+                                <span class="badge bg-light text-dark">{{ tag.strip() }}</span>
+                            {% endfor %}
+                        </p>
+                    {% endif %}
+                    <small class="text-muted">Додано {{ k.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-muted">Ви ще не зберігали фрагменти з цього документу.</p>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-3">
+        <div class="card shadow-sm sticky-top" style="top: 100px;">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">Швидкі дії</h6>
+            </div>
+            <div class="list-group list-group-flush">
+                <a href="{{ url_for('download_document', doc_id=doc.id) }}" 
+                   class="list-group-item list-group-item-action">Завантажити оригінал</a>
+                <a href="{{ url_for('document_list') }}" 
+                   class="list-group-item list-group-item-action">Повернутися до списку</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

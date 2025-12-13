@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Усі документи{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Бібліотека документів</h2>
+
+<!-- Пошук та фільтри -->
+<div class="card mb-4 shadow-sm">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-5">
+                <input type="text" name="q" class="form-control" placeholder="Повнотекстовий пошук…" 
+                       value="{{ request.args.get('q', '') }}">
+            </div>
+            <div class="col-md-3">
+                <input type="text" name="author" class="form-control" placeholder="Автор" 
+                       value="{{ request.args.get('author', '') }}">
+            </div>
+            <div class="col-md-2">
+                <input type="number" name="year_from" class="form-control" placeholder="Рік від" 
+                       value="{{ request.args.get('year_from', '') }}">
+            </div>
+            <div class="col-md-2">
+                <input type="number" name="year_to" class="form-control" placeholder="Рік до" 
+                       value="{{ request.args.get('year_to', '') }}">
+            </div>
+            <div class="col-md-4">
+                <select name="type" class="form-select">
+                    <option value="">Усі типи</option>
+                    <option value="стаття" {% if request.args.get('type')=='стаття' %}selected{% endif %}>Наукова стаття</option>
+                    <option value="звіт" {% if request.args.get('type')=='звіт' %}selected{% endif %}>Аналітичний звіт</option>
+                    <option value="дисертація" {% if request.args.get('type')=='дисертація' %}selected{% endif %}>Дисертація</option>
+                    <option value="книга" {% if request.args.get('type')=='книга' %}selected{% endif %}>Книга</option>
+                    <option value="інше" {% if request.args.get('type')=='інше' %}selected{% endif %}>Інше</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Знайти</button>
+            </div>
+            <div class="col-md-2">
+                <a href="{{ url_for('document_list') }}" class="btn btn-outline-secondary w-100">Скинути</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Список документів -->
+{% if documents %}
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        {% for doc in documents %}
+        <div class="col">
+            <div class="card h-100 shadow-sm hover-shadow">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <a href="{{ url_for('document_detail', doc_id=doc.id) }}" class="text-decoration-none">
+                            {{ doc.title }}
+                        </a>
+                    </h5>
+                    <p class="card-text text-muted mb-2">
+                        <strong>{{ doc.authors }}</strong> 
+                        {% if doc.year %}• {{ doc.year }}{% endif %}
+                    </p>
+                    <p class="card-text">
+                        {{ doc.source|truncate(120) if doc.source else 'Джерело не вказано' }}
+                    </p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-secondary">{{ doc.doc_type }}</span>
+                        <small class="text-muted">{{ doc.uploaded_at.strftime('%d.%m.%Y') }}</small>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="{{ url_for('download_document', doc_id=doc.id) }}" class="btn btn-sm btn-outline-primary">
+                        Завантажити файл
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="text-center py-5">
+        <p class="text-muted fs-4">Документи не знайдено</p>
+        {% if request.args|length > 1 %}
+            <a href="{{ url_for('document_list') }}" class="btn btn-primary">Показати всі документи</a>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}

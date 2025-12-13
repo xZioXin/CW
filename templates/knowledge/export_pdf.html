@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <title>Конспект</title>
+    <style>
+        body { font-family: DejaVu Sans, sans-serif; margin: 40px; line-height: 1.6; }
+        h1 { text-align: center; color: #0066cc; }
+        h2 { color: #0066cc; border-bottom: 1px solid #0066cc; padding-bottom: 5px; }
+        .quote { font-style: italic; margin: 15px 0; background: #f8f9fa; padding: 15px; border-left: 5px solid #0066cc; }
+        .note { background: #fff3cd; padding: 10px; border-radius: 5px; }
+        .tags { color: #666; font-size: 0.9em; }
+        .meta { color: #555; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Мій конспект знань</h1>
+    <p class="meta"><strong>Дата:</strong> {{ now() }}</p>
+    <p class="meta"><strong>Кількість фрагментів:</strong> {{ knowledges|length }}</p>
+
+    {% for k in knowledges %}
+        <h2>Джерело: {{ k.document.title }}</h2>
+        <p class="meta">Автори: {{ k.document.authors }} ({{ k.document.year or '—' }})</p>
+
+        <div class="quote">{{ k.text }}</div>
+
+        {% if k.note %}
+            <div class="note"><strong>Анотація:</strong> {{ k.note }}</div>
+        {% endif %}
+
+        {% if k.tags %}
+            <p class="tags"><strong>Теги:</strong> {{ k.tags }}</p>
+        {% endif %}
+
+        <hr style="border: 1px dashed #ccc; margin: 30px 0;">
+    {% endfor %}
+</body>
+</html>

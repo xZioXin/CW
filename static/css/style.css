@@ -1,0 +1,49 @@
+:root {
+    --primary: #0d6efd;
+    --hover-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+body {
+    background: #f8f9fa;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.hover-shadow:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--hover-shadow);
+    transition: all 0.3s ease;
+}
+
+.card {
+    border: none;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+
+.card-header {
+    border-radius: 12px 12px 0 0 !important;
+}
+
+.btn {
+    border-radius: 8px;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+}
+
+blockquote {
+    border-left: 4px solid var(--primary);
+    padding-left: 1rem;
+    margin-left: 0;
+    font-style: italic;
+}
+
+.badge {
+    font-size: 0.85em;
+}
+
+.sticky-top {
+    top: 100px;
+}
