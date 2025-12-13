@@ -5,13 +5,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 db = SQLAlchemy()
 
-# Оновлено: Використовуємо Association Object для збереження порядку
+# Оновлена модель зв'язку
 class CollectionItem(db.Model):
     __tablename__ = 'collection_item'
     id = db.Column(db.Integer, primary_key=True)
     collection_id = db.Column(db.Integer, db.ForeignKey('collection.id'))
     knowledge_id = db.Column(db.Integer, db.ForeignKey('knowledge.id'))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow) # Час додавання в колекцію
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     collection = db.relationship("Collection", back_populates="items")
     knowledge = db.relationship("Knowledge", back_populates="collection_items")
@@ -30,10 +30,6 @@ class User(UserMixin, db.Model):
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
-
-class Category(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), unique=True, nullable=False)
 
 class Document(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -60,8 +56,6 @@ class Knowledge(db.Model):
 
     document = db.relationship('Document', backref='knowledges')
     user = db.relationship('User', backref='knowledges')
-    
-    # Зв'язок з елементами колекції
     collection_items = db.relationship('CollectionItem', back_populates='knowledge', cascade="all, delete-orphan")
 
 class Collection(db.Model):
@@ -71,7 +65,6 @@ class Collection(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship('User', backref='collections')
-    # Сортуємо items по created_at (порядок додавання)
     items = db.relationship('CollectionItem', back_populates='collection', 
                             order_by='CollectionItem.created_at', cascade="all, delete-orphan")
 

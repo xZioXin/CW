@@ -4,54 +4,83 @@
 {% block content %}
 <h2 class="mb-4">Моя база знань</h2>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-body">
-        <form method="GET" class="row g-2">
-            <div class="col-md-6">
-                <input type="text" name="q" class="form-control" placeholder="Пошук по тексту або примітці..." value="{{ request.args.get('q', '') }}">
-            </div>
-            <div class="col-md-4">
-                <input type="text" name="tag" class="form-control" placeholder="Фільтр по тегу" value="{{ request.args.get('tag', '') }}">
-            </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">Шукати</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <ul class="nav nav-tabs mb-4" id="knowledgeTab" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">Усі конспекти</button>
+        <button class="nav-link {% if active_tab == 'all' %}active{% endif %}" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button" role="tab">Усі конспекти</button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="collections-tab" data-bs-toggle="tab" data-bs-target="#collections" type="button" role="tab">Колекції</button>
+        <button class="nav-link {% if active_tab == 'collections' %}active{% endif %}" id="collections-tab" data-bs-toggle="tab" data-bs-target="#collections" type="button" role="tab">Колекції</button>
     </li>
 </ul>
 
 <div class="tab-content" id="knowledgeTabContent">
     
-    <div class="tab-pane fade show active" id="all" role="tabpanel">
+    <div class="tab-pane fade {% if active_tab == 'all' %}show active{% endif %}" id="all" role="tabpanel">
         
+        <div class="card shadow-sm mb-4 bg-light">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('my_knowledge') }}">
+                    <input type="hidden" name="tab" value="all">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-5">
+                            <input type="text" name="q" class="form-control" placeholder="Пошук по тексту..." value="{{ request.args.get('q', '') }}">
+                        </div>
+                        <div class="col-md-5">
+                            <input type="text" name="tag" class="form-control" placeholder="Тег" value="{{ request.args.get('tag', '') }}">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Знайти</button>
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <select name="filter_col" class="form-select">
+                                <option value="">Всі колекції</option>
+                                {% for col in all_cols %}
+                                <option value="{{ col.id }}" {% if request.args.get('filter_col')|int == col.id %}selected{% endif %}>
+                                    📁 {{ col.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <select name="filter_doc" class="form-select">
+                                <option value="">Всі документи</option>
+                                {% for d in all_docs %}
+                                <option value="{{ d.id }}" {% if request.args.get('filter_doc')|int == d.id %}selected{% endif %}>
+                                    📄 {{ d.title|truncate(40) }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <select name="sort_by" class="form-select" onchange="this.form.submit()">
+                                <option value="date_desc" {% if request.args.get('sort_by') == 'date_desc' %}selected{% endif %}>▼ Спочатку нові</option>
+                                <option value="date_asc" {% if request.args.get('sort_by') == 'date_asc' %}selected{% endif %}>▲ Спочатку старі</option>
+                                <option value="doc_title" {% if request.args.get('sort_by') == 'doc_title' %}selected{% endif %}>🔤 За назвою статті</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <form method="POST" id="bulkForm">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="ordered_ids" id="ordered_ids">
             
             <div class="d-flex flex-wrap align-items-center mb-3 p-2 bg-light rounded gap-2">
                 <span class="me-2 fw-bold">Дії з обраними:</span>
-                
                 <div class="input-group w-auto">
                     <select name="collection_id" class="form-select">
                         <option value="">-- Оберіть колекцію --</option>
-                        {% for c in collections %}
+                        {% for c in all_cols %}
                             <option value="{{ c.id }}">{{ c.name }}</option>
                         {% endfor %}
                     </select>
                     <button type="submit" name="action" value="add_to_collection" class="btn btn-success">Додати</button>
                 </div>
-
                 <div class="vr mx-2"></div>
-
                 <button type="submit" name="action" value="export_docx" class="btn btn-primary">
                     <i class="bi bi-file-word"></i> Експортувати в DOCX
                 </button>
@@ -74,7 +103,6 @@
                                         <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editKnowledgeModal{{ k.id }}">
                                             <i class="bi bi-pencil"></i> Редагувати
                                         </button>
-                                        
                                         <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmDelete('{{ url_for('delete_knowledge', k_id=k.id) }}')">
                                             <i class="bi bi-trash"></i> Видалити
                                         </button>
@@ -85,7 +113,6 @@
                                 {% if k.note %}
                                     <p class="mb-1 text-muted small bg-light p-2 rounded"><strong>Примітка:</strong> {{ k.note }}</p>
                                 {% endif %}
-                                
                                 <div class="d-flex justify-content-between align-items-end mt-2">
                                     <div>
                                         {% if k.tags %}
@@ -93,7 +120,6 @@
                                                 <span class="badge bg-secondary">{{ t.strip() }}</span>
                                             {% endfor %}
                                         {% endif %}
-                                        
                                         {% if k.collection_items %}
                                             <div class="mt-2">
                                                 <small class="text-muted me-1">Колекції:</small>
@@ -114,7 +140,6 @@
                             <div class="modal-content">
                                 <form action="{{ url_for('edit_knowledge', k_id=k.id) }}" method="POST">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                    
                                     <div class="modal-header">
                                         <h5 class="modal-title">Редагувати конспект</h5>
                                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -149,14 +174,40 @@
         </form>
     </div>
 
-    <div class="tab-pane fade" id="collections" role="tabpanel">
+    <div class="tab-pane fade {% if active_tab == 'collections' %}show active{% endif %}" id="collections" role="tabpanel">
+        
+        <div class="card shadow-sm mb-4 bg-light">
+            <div class="card-body">
+                <form method="GET" action="{{ url_for('my_knowledge') }}" class="row g-2 align-items-center">
+                    <input type="hidden" name="tab" value="collections">
+                    <div class="col-md-3">
+                        <input type="text" name="col_q" class="form-control" placeholder="Назва колекції..." value="{{ request.args.get('col_q', '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <input type="text" name="col_item_q" class="form-control" placeholder="Містить текст конспекту..." value="{{ request.args.get('col_item_q', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select name="col_sort" class="form-select" onchange="this.form.submit()">
+                            <option value="name_asc" {% if request.args.get('col_sort') == 'name_asc' %}selected{% endif %}>За назвою (А-Я)</option>
+                            <option value="name_desc" {% if request.args.get('col_sort') == 'name_desc' %}selected{% endif %}>За назвою (Я-А)</option>
+                            <option value="count_desc" {% if request.args.get('col_sort') == 'count_desc' %}selected{% endif %}>За кількістю (більше)</option>
+                            <option value="count_asc" {% if request.args.get('col_sort') == 'count_asc' %}selected{% endif %}>За кількістю (менше)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Фільтрувати</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         <form action="{{ url_for('create_collection') }}" method="POST" class="row g-2 mb-4 align-items-center">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div class="col-auto">
                 <input type="text" name="name" class="form-control" placeholder="Назва нової колекції" required>
             </div>
             <div class="col-auto">
-                <button type="submit" class="btn btn-primary">Створити</button>
+                <button type="submit" class="btn btn-success"><i class="bi bi-plus-lg"></i> Створити</button>
             </div>
         </form>
 
@@ -219,18 +270,17 @@
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill"></i> Видалення</h5>
+                <h5 class="modal-title">Видалення</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <p class="fs-5">Ви дійсно бажаєте видалити цей конспект?</p>
-                <p class="text-muted small">Цю дію неможливо буде скасувати.</p>
+                <p>Ви дійсно бажаєте видалити цей елемент?</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Ні, скасувати</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
                 <form id="deleteConfirmForm" method="POST" action="">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-danger">Так, видалити</button>
+                    <button type="submit" class="btn btn-danger">Видалити</button>
                 </form>
             </div>
         </div>
@@ -247,6 +297,7 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // Auto-resize textarea
         const textareas = document.querySelectorAll("textarea.auto-resize");
         function resize(el) {
             el.style.height = "auto";
@@ -260,9 +311,9 @@
             });
         });
 
+        // Click ordering for DOCX export
         const orderedInput = document.getElementById('ordered_ids');
         let selectedOrder = [];
-
         document.querySelectorAll('.knowledge-checkbox').forEach(cb => {
             cb.addEventListener('change', function() {
                 const id = this.value;
@@ -274,15 +325,6 @@
                 orderedInput.value = selectedOrder.join(',');
             });
         });
-
-        const hash = window.location.hash;
-        if (hash) {
-            const triggerEl = document.querySelector(`button[data-bs-target="${hash}"]`);
-            if (triggerEl) {
-                const tab = new bootstrap.Tab(triggerEl);
-                tab.show();
-            }
-        }
     });
 
     function confirmDelete(url) {
