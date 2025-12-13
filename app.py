@@ -12,7 +12,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 
 from config import Config
-from models import db, User, Document, Knowledge, Collection, RecentlyViewed
+from models import db, User, Document, Knowledge, Collection, CollectionItem, RecentlyViewed
 from forms import RegistrationForm, LoginForm, DocumentForm, DocumentEditForm, KnowledgeForm, CollectionForm
 from utils import init_search_index, search_fulltext, index_document, delete_document_from_index, backup_database
 
@@ -25,7 +25,6 @@ def create_app():
     os.makedirs(app.instance_path, exist_ok=True)
 
     db.init_app(app)
-    # Для CSRF токена у формах без FlaskForm
     from flask_wtf.csrf import CSRFProtect
     csrf = CSRFProtect(app)
 
@@ -39,13 +38,11 @@ def create_app():
     def load_user(user_id):
         return User.query.get(int(user_id))
 
-    # === Context Processor для Recently Viewed ===
     @app.context_processor
     def inject_recent():
         if current_user.is_authenticated:
-            # Останні 10 переглянутих
             recent_views = RecentlyViewed.query.filter_by(user_id=current_user.id)\
-                .order_by(RecentlyViewed.viewed_at.desc()).limit(20).all() # беремо із запасом
+                .order_by(RecentlyViewed.viewed_at.desc()).limit(20).all()
             
             seen = set()
             unique_recent = []
@@ -66,8 +63,6 @@ def create_app():
             admin.set_password('admin123')
             db.session.add(admin)
             db.session.commit()
-
-    # === Основні маршрути ===
 
     @app.route('/')
     def index():
@@ -243,15 +238,13 @@ def create_app():
         k = Knowledge.query.get_or_404(k_id)
         if k.user_id != current_user.id: abort(403)
         
-        # Використовуємо request.form для прив'язки даних
-        form = KnowledgeForm(request.form, obj=k)
+        # ВИПРАВЛЕНО: Ручне збереження даних для надійності
+        k.text = request.form.get('text', k.text)
+        k.note = request.form.get('note', k.note)
+        k.tags = request.form.get('tags', k.tags)
         
-        if form.validate(): # validate() замість validate_on_submit() бо це сабміт з модалки вручну
-            form.populate_obj(k)
-            db.session.commit()
-            flash('Конспект оновлено', 'success')
-        else:
-            flash('Помилка валідації. Перевірте дані.', 'danger')
+        db.session.commit()
+        flash('Конспект оновлено', 'success')
             
         return redirect(url_for('my_knowledge'))
 
@@ -260,7 +253,6 @@ def create_app():
     def delete_knowledge(k_id):
         k = Knowledge.query.get_or_404(k_id)
         if k.user_id != current_user.id: abort(403)
-        k.collections = [] 
         db.session.delete(k)
         db.session.commit()
         flash('Конспект видалено', 'success')
@@ -282,7 +274,6 @@ def create_app():
         if request.method == 'POST':
             action = request.form.get('action')
             
-            # 1. ЕКСПОРТ В DOCX
             if action == 'export_docx':
                 selected_ids = request.form.getlist('knowledge_ids')
                 ordered_ids_str = request.form.get('ordered_ids', '')
@@ -291,28 +282,22 @@ def create_app():
                     flash('Нічого не вибрано', 'warning')
                     return redirect(url_for('my_knowledge'))
 
-                # Впорядковуємо згідно з порядком кліків
                 final_ids = []
                 if ordered_ids_str:
                     click_order = ordered_ids_str.split(',')
-                    # Беремо тільки ті, що реально вибрані (чекнуті)
                     for oid in click_order:
                         if oid in selected_ids:
                             final_ids.append(int(oid))
-                    # Додаємо ті, що вибрані, но чомусь не потрапили в order (на всяк випадок)
                     for sid in selected_ids:
                         if int(sid) not in final_ids:
                             final_ids.append(int(sid))
                 else:
                     final_ids = [int(x) for x in selected_ids]
 
-                # Отримуємо об'єкти з БД, але зберігаємо порядок списку final_ids
-                # SQL IN не гарантує порядок, тому сортуємо вручну в Python
                 k_objects = Knowledge.query.filter(Knowledge.id.in_(final_ids)).all()
                 k_map = {k.id: k for k in k_objects}
                 sorted_knowledge = [k_map[fid] for fid in final_ids if fid in k_map]
 
-                # Генерація DOCX
                 doc = DocxDoc()
                 doc.add_heading('Експортовані конспекти', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
                 
@@ -332,7 +317,6 @@ def create_app():
                 return send_file(buffer, as_attachment=True, download_name=f"export_{datetime.now().strftime('%H-%M')}.docx",
                                  mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
 
-            # 2. ДОДАВАННЯ ДО КОЛЕКЦІЇ
             elif action == 'add_to_collection':
                 collection_id = request.form.get('collection_id')
                 selected_ids = request.form.getlist('knowledge_ids')
@@ -342,8 +326,12 @@ def create_app():
                         count = 0
                         for kid in selected_ids:
                             kn = Knowledge.query.get(int(kid))
-                            if kn and kn.user_id == current_user.id and kn not in coll.knowledges:
-                                coll.knowledges.append(kn)
+                            # Перевіряємо, чи вже є цей конспект в колекції
+                            exists = CollectionItem.query.filter_by(collection_id=coll.id, knowledge_id=kn.id).first()
+                            if kn and kn.user_id == current_user.id and not exists:
+                                # Додаємо через CollectionItem
+                                item = CollectionItem(collection=coll, knowledge=kn)
+                                db.session.add(item)
                                 count += 1
                         db.session.commit()
                         flash(f'Додано {count} записів', 'success')
@@ -385,12 +373,14 @@ def create_app():
     @login_required
     def remove_from_collection(c_id, k_id):
         c = Collection.query.get_or_404(c_id)
-        k = Knowledge.query.get_or_404(k_id)
         if c.user_id != current_user.id: abort(403)
-        if k in c.knowledges:
-            c.knowledges.remove(k)
+        
+        # Знаходимо item і видаляємо
+        item = CollectionItem.query.filter_by(collection_id=c.id, knowledge_id=k_id).first()
+        if item:
+            db.session.delete(item)
             db.session.commit()
-        # Повертаємось на вкладку колекцій за допомогою якоря #collections
+            
         return redirect(url_for('my_knowledge', _anchor='collections'))
 
     @app.route('/collection/<int:c_id>/export/docx')
@@ -401,7 +391,9 @@ def create_app():
         
         doc = DocxDoc()
         doc.add_heading(f'Колекція: {c.name}', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
-        for i, k in enumerate(c.knowledges, 1):
+        # Ітеруємося по items, які вже відсортовані
+        for i, item in enumerate(c.items, 1):
+            k = item.knowledge
             doc.add_heading(f"{i}. {k.document.title}", level=1)
             doc.add_paragraph(f"Автори: {k.document.authors}")
             doc.add_paragraph(k.text, style='Intense Quote')
@@ -417,8 +409,6 @@ def create_app():
         return send_file(buffer, as_attachment=True, download_name=f"{secure_filename(c.name)}.docx",
                          mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
         
-    # === Адмінка ===
-
     @app.route('/admin/users')
     @login_required
     def admin_users():

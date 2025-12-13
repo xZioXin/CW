@@ -85,12 +85,22 @@
                                 {% if k.note %}
                                     <p class="mb-1 text-muted small bg-light p-2 rounded"><strong>Примітка:</strong> {{ k.note }}</p>
                                 {% endif %}
+                                
                                 <div class="d-flex justify-content-between align-items-end mt-2">
                                     <div>
                                         {% if k.tags %}
                                             {% for t in k.tags.split(',') %}
                                                 <span class="badge bg-secondary">{{ t.strip() }}</span>
                                             {% endfor %}
+                                        {% endif %}
+                                        
+                                        {% if k.collection_items %}
+                                            <div class="mt-2">
+                                                <small class="text-muted me-1">Колекції:</small>
+                                                {% for item in k.collection_items %}
+                                                    <span class="badge bg-info text-dark">{{ item.collection.name }}</span>
+                                                {% endfor %}
+                                            </div>
                                         {% endif %}
                                     </div>
                                     <small class="text-muted">{{ k.created_at.strftime('%d.%m.%Y') }}</small>
@@ -155,14 +165,14 @@
             <div class="accordion-item">
                 <h2 class="accordion-header" id="heading{{ c.id }}">
                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ c.id }}">
-                        {{ c.name }} <span class="badge bg-secondary ms-2">{{ c.knowledges|length }}</span>
+                        {{ c.name }} <span class="badge bg-secondary ms-2">{{ c.items|length }}</span>
                     </button>
                 </h2>
                 <div id="collapse{{ c.id }}" class="accordion-collapse collapse" data-bs-parent="#accordionCollections">
                     <div class="accordion-body bg-light">
                         <div class="mb-3 border-bottom pb-2">
-                            <a href="{{ url_for('export_collection_docx', c_id=c.id) }}" class="btn btn-success btn-sm me-2">
-                                <i class="bi bi-file-word"></i> DOCX
+                            <a href="{{ url_for('export_collection_docx', c_id=c.id) }}" class="btn btn-primary btn-sm me-2">
+                                <i class="bi bi-file-word"></i> Експортувати в DOCX
                             </a>
                             <form action="{{ url_for('rename_collection', c_id=c.id) }}" method="POST" class="d-inline-block me-2">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -176,9 +186,10 @@
                             </button>
                         </div>
 
-                        {% if c.knowledges %}
+                        {% if c.items %}
                             <div class="list-group">
-                            {% for k in c.knowledges %}
+                            {% for item in c.items %}
+                                {% set k = item.knowledge %}
                                 <div class="list-group-item d-flex justify-content-between align-items-start">
                                     <div class="ms-2 me-auto">
                                         <div class="fw-bold">{{ k.document.title }}</div>
@@ -186,8 +197,8 @@
                                     </div>
                                     <form action="{{ url_for('remove_from_collection', c_id=c.id, k_id=k.id) }}" method="POST">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Прибрати з колекції">
-                                            <i class="bi bi-x-lg"></i>
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                                            <i class="bi bi-x-lg"></i> Прибрати
                                         </button>
                                     </form>
                                 </div>
@@ -236,7 +247,6 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // 1. Авто-висота Textarea
         const textareas = document.querySelectorAll("textarea.auto-resize");
         function resize(el) {
             el.style.height = "auto";
@@ -250,7 +260,6 @@
             });
         });
 
-        // 2. Збереження порядку кліків для експорту
         const orderedInput = document.getElementById('ordered_ids');
         let selectedOrder = [];
 
@@ -266,7 +275,6 @@
             });
         });
 
-        // 3. Активна вкладка при перезавантаженні (для колекцій)
         const hash = window.location.hash;
         if (hash) {
             const triggerEl = document.querySelector(`button[data-bs-target="${hash}"]`);
@@ -277,7 +285,6 @@
         }
     });
 
-    // 4. Функція виклику модалки видалення
     function confirmDelete(url) {
         const form = document.getElementById('deleteConfirmForm');
         form.action = url;
