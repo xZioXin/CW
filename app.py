@@ -14,10 +14,10 @@ from models import db, User, Document, Knowledge, Collection, CollectionItem, Re
 from forms import RegistrationForm, LoginForm, DocumentForm, DocumentEditForm
 from utils import init_search_index, search_fulltext, index_document, delete_document_from_index, backup_database
 
-def create_app():
+def create_app(config_class=Config):
     # Ініціалізація додатку та завантаження конфігурації
     app = Flask(__name__)
-    app.config.from_object(Config)
+    app.config.from_object(config_class)
 
     # Створюємо потрібні папки, якщо їх немає
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -57,8 +57,13 @@ def create_app():
         return dict(recently_viewed_docs=[])
 
     with app.app_context():
+        # Створюємо таблиці тільки якщо це не тест (або якщо тест явно не керує цим)
+        # Але оскільки в тестах ми використовуємо in-memory DB, create_all тут безпечний
         db.create_all()
+        
+        # Ініціалізація пошуку (якщо це не тестування або налаштовано окремо)
         init_search_index()
+        
         # Створюємо адміна за замовчуванням, якщо його немає
         if not User.query.filter_by(email='admin@example.com').first():
             admin = User(email='admin@example.com', name='Адміністратор системи', role='admin', is_active=True)
