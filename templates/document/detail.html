@@ -19,10 +19,22 @@
                     <tr><th>Завантажено</th><td>{{ doc.uploaded_at.strftime('%d.%m.%Y %H:%M') }} 
                         користувачем {{ doc.user.name }}</td></tr>
                 </table>
+
+                {% if current_user.role == 'admin' or current_user.id == doc.uploaded_by %}
+                <div class="mt-3 pt-3 border-top">
+                    <a href="{{ url_for('edit_document', doc_id=doc.id) }}" class="btn btn-warning btn-sm me-2">
+                        <i class="bi bi-pencil"></i> Редагувати
+                    </a>
+                    <form action="{{ url_for('delete_document', doc_id=doc.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Ви впевнені, що хочете видалити цей документ? Цю дію не можна скасувати.');">
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="bi bi-trash"></i> Видалити
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
             </div>
         </div>
 
-        <!-- Форма для виділення цитати та збереження як знання -->
         <div class="card shadow mb-4">
             <div class="card-header">
                 <h5>Додати цитату / фрагмент як знання</h5>
@@ -49,7 +61,6 @@
             </div>
         </div>
 
-        <!-- Список вже збережених знань по цьому документу -->
         <h4>Ваші збережені фрагменти з цього документу ({{ knowledges|length }})</h4>
         {% if knowledges %}
             {% for k in knowledges %}

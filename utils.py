@@ -17,7 +17,7 @@ def get_schema():
         title=TEXT(stored=True, phrase=True),
         authors=TEXT(stored=True),
         content=TEXT(stored=True, phrase=True),
-        year=DATETIME(stored=True),          # ← залишаємо DATETIME
+        year=DATETIME(stored=True),
         tags=KEYWORD(lowercase=True, commas=True)
     )
 
@@ -53,7 +53,6 @@ def index_document(doc_id, filepath):
     doc = Document.query.get(doc_id)
     content = extract_text(filepath)
 
-    # ГОЛОВНЕ ВИПРАВЛЕННЯ — якщо рік є, перетворюємо в datetime(рік, 1, 1)
     year_dt = None
     if doc.year:
         try:
@@ -66,9 +65,18 @@ def index_document(doc_id, filepath):
         title=doc.title or "",
         authors=doc.authors or "",
         content=content,
-        year=year_dt,           # ← тепер це datetime або None
+        year=year_dt,
         tags=""
     )
+    writer.commit()
+
+def delete_document_from_index(doc_id):
+    """Видаляє документ із пошукового індексу Whoosh"""
+    if not os.path.exists(current_app.config['WHOOSH_BASE']):
+        return
+    ix = open_dir(current_app.config['WHOOSH_BASE'])
+    writer = ix.writer()
+    writer.delete_by_term('doc_id', str(doc_id))
     writer.commit()
 
 def search_fulltext(query_str, limit=100):

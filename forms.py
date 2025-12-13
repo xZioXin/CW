@@ -34,6 +34,13 @@ class DocumentForm(FlaskForm):
     ])
     submit = SubmitField('Завантажити')
 
+class DocumentEditForm(DocumentForm):
+    # У формі редагування файл не є обов'язковим
+    file = FileField('Оновити файл (залиште пустим, якщо не змінюєте)', validators=[
+        FileAllowed(['pdf', 'docx'], 'Тільки PDF та DOCX!')
+    ])
+    submit = SubmitField('Зберегти зміни')
+
 class KnowledgeForm(FlaskForm):
     text = TextAreaField('Виділений фрагмент / цитата', validators=[DataRequired()])
     note = TextAreaField('Ваша анотація / коментар', validators=[Optional()])

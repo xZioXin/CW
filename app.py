@@ -16,8 +16,8 @@ import os
 
 from config import Config
 from models import db, User, Document, Knowledge, Collection, Category
-from forms import RegistrationForm, LoginForm, DocumentForm, KnowledgeForm, CollectionForm
-from utils import init_search_index, search_fulltext, index_document, backup_database, extract_text
+from forms import RegistrationForm, LoginForm, DocumentForm, DocumentEditForm, KnowledgeForm, CollectionForm
+from utils import init_search_index, search_fulltext, index_document, delete_document_from_index, backup_database, extract_text
 
 def create_app():
     app = Flask(__name__)
@@ -108,7 +108,6 @@ def create_app():
             f = form.file.data
             original_filename = f.filename
             
-            # Генеруємо унікальну безпечну назву для збереження на диску
             extension = os.path.splitext(original_filename)[1].lower()
             if not extension in ['.pdf', '.docx']:
                 flash('Дозволені лише PDF та DOCX', 'danger')
@@ -124,20 +123,97 @@ def create_app():
                 year=form.year.data or None,
                 source=form.source.data or '',
                 doc_type=form.doc_type.data,
-                original_filename=original_filename,     # ← справжня назва
-                stored_filename=unique_filename,         # ← як лежить на диску
+                original_filename=original_filename,
+                stored_filename=unique_filename,
                 uploaded_by=current_user.id
             )
             db.session.add(doc)
             db.session.commit()
 
-            # Індексація
             index_document(doc.id, filepath)
 
             flash(f'Документ "{original_filename}" успішно завантажено!', 'success')
             return redirect(url_for('document_list'))
 
         return render_template('document/upload.html', form=form)
+
+    @app.route('/document/<int:doc_id>/edit', methods=['GET', 'POST'])
+    @login_required
+    def edit_document(doc_id):
+        doc = Document.query.get_or_404(doc_id)
+        
+        # Перевірка прав: Адмін АБО Власник
+        if current_user.role != 'admin' and doc.uploaded_by != current_user.id:
+            abort(403)
+            
+        form = DocumentEditForm(obj=doc)
+        
+        if form.validate_on_submit():
+            doc.title = form.title.data
+            doc.authors = form.authors.data
+            doc.year = form.year.data or None
+            doc.source = form.source.data
+            doc.doc_type = form.doc_type.data
+            
+            # Якщо завантажено новий файл
+            if form.file.data:
+                f = form.file.data
+                original_filename = f.filename
+                extension = os.path.splitext(original_filename)[1].lower()
+                
+                # Видаляємо старий файл
+                old_path = os.path.join(app.config['UPLOAD_FOLDER'], doc.stored_filename)
+                if os.path.exists(old_path):
+                    os.remove(old_path)
+                
+                # Зберігаємо новий
+                unique_filename = str(uuid.uuid4()) + extension
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+                f.save(filepath)
+                
+                doc.original_filename = original_filename
+                doc.stored_filename = unique_filename
+            
+            db.session.commit()
+            
+            # Оновлюємо індекс (метадані або повний текст)
+            current_filepath = os.path.join(app.config['UPLOAD_FOLDER'], doc.stored_filename)
+            index_document(doc.id, current_filepath)
+            
+            flash('Документ успішно оновлено!', 'success')
+            return redirect(url_for('document_detail', doc_id=doc.id))
+            
+        return render_template('document/upload.html', form=form, title="Редагування документу")
+
+    @app.route('/document/<int:doc_id>/delete', methods=['POST'])
+    @login_required
+    def delete_document(doc_id):
+        doc = Document.query.get_or_404(doc_id)
+        
+        # Перевірка прав: Адмін АБО Власник
+        if current_user.role != 'admin' and doc.uploaded_by != current_user.id:
+            abort(403)
+            
+        # 1. Видаляємо файл з диску
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], doc.stored_filename)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"Помилка видалення файлу: {e}")
+
+        # 2. Видаляємо з пошукового індексу
+        delete_document_from_index(doc.id)
+
+        # 3. Видаляємо пов'язані знання
+        Knowledge.query.filter_by(document_id=doc.id).delete()
+
+        # 4. Видаляємо запис з БД
+        db.session.delete(doc)
+        db.session.commit()
+        
+        flash('Документ видалено', 'success')
+        return redirect(url_for('document_list'))
 
     @app.route('/documents')
     @login_required
@@ -184,7 +260,7 @@ def create_app():
             directory=app.config['UPLOAD_FOLDER'],
             path=doc.stored_filename,
             as_attachment=True,
-            download_name=doc.original_filename  # ← користувач бачить саме цю назву!
+            download_name=doc.original_filename
         )
 
     @app.route('/knowledge/add/<int:doc_id>', methods=['POST'])
@@ -230,6 +306,11 @@ def create_app():
     def toggle_user(user_id):
         if current_user.role != 'admin':
             abort(403)
+        # Забороняємо блокувати самого себе
+        if user_id == current_user.id:
+            flash('Ви не можете заблокувати самі себе', 'danger')
+            return redirect(url_for('admin_users'))
+            
         user = User.query.get_or_404(user_id)
         user.is_active = not user.is_active
         db.session.commit()
@@ -253,7 +334,6 @@ def create_app():
             flash('Назва колекції не може бути порожньою', 'danger')
             return redirect(url_for('my_knowledge'))
         
-        # Перевіряємо, чи немає вже такої назви у користувача
         exists = Collection.query.filter_by(
             name=name,
             user_id=current_user.id
@@ -287,7 +367,6 @@ def create_app():
             flash('Немає вибраних фрагментів', 'warning')
             return redirect(url_for('my_knowledge'))
 
-        # Створюємо документ
         doc = DocxDoc()
         doc.add_heading('Конспект знань', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
 
@@ -302,37 +381,31 @@ def create_app():
         doc.add_page_break()
 
         for i, k in enumerate(knowledges, 1):
-            # Заголовок джерела — синій колір
             heading = doc.add_heading(level=1)
             run = heading.add_run(f"{i}. {k.document.title}")
-            run.font.color.rgb = RGBColor(0, 102, 204)  # Тільки 3 значення: R, G, B
+            run.font.color.rgb = RGBColor(0, 102, 204)
             run.font.size = Pt(14)
             run.bold = True
 
-            # Метадані джерела
             meta = doc.add_paragraph()
             meta.add_run("Автори: ").bold = True
             meta.add_run(f"{k.document.authors} ({k.document.year or '—'})")
 
-            # Цитата
             quote = doc.add_paragraph(k.text)
             quote.style = 'Intense Quote'
 
-            # Анотація
             if k.note:
                 note_p = doc.add_paragraph()
                 note_p.add_run("Анотація: ").bold = True
                 note_p.add_run(k.note)
 
-            # Теги
             if k.tags:
                 tags_p = doc.add_paragraph()
                 tags_p.add_run("Теги: ").bold = True
                 tags_p.add_run(k.tags)
 
-            doc.add_paragraph()  # відступ між записами
+            doc.add_paragraph()
 
-        # Зберігаємо у пам’ять
         buffer = BytesIO()
         doc.save(buffer)
         buffer.seek(0)
@@ -344,11 +417,9 @@ def create_app():
             mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         )
 
-    # === ЕКСПОРТ У PDF через Word (найпростіший і надійний спосіб на Windows) ===
     @app.route('/knowledge/export/pdf')
     @login_required
     def export_knowledge_pdf():
-        # Спочатку генеруємо DOCX у тимчасовий файл
         knowledge_ids = request.args.get('ids', '')
         ids = [int(x) for x in knowledge_ids.split(',') if x.isdigit()]
         knowledges = Knowledge.query.filter(
@@ -360,7 +431,6 @@ def create_app():
             flash('Немає вибраних фрагментів', 'warning')
             return redirect(url_for('my_knowledge'))
 
-        # Створюємо DOCX (той самий код, що й вище)
         doc = DocxDoc()
         doc.add_heading('Конспект знань', 0).alignment = WD_ALIGN_PARAGRAPH.CENTER
         doc.add_paragraph(f"Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}")
@@ -381,14 +451,12 @@ def create_app():
                 p.add_run(k.tags)
             doc.add_paragraph()
 
-        # Зберігаємо тимчасово
         temp_dir = tempfile.gettempdir()
         docx_path = os.path.join(temp_dir, f"conspect_{current_user.id}.docx")
         pdf_path = os.path.join(temp_dir, f"Конспект_{datetime.now().strftime('%Y-%m-%d')}.pdf")
 
         doc.save(docx_path)
 
-        # Конвертуємо у PDF через Microsoft Word (він є майже на всіх Windows)
         try:
             from docx2pdf import convert
             convert(docx_path, pdf_path)
@@ -396,7 +464,6 @@ def create_app():
             with open(pdf_path, 'rb') as f:
                 pdf_data = f.read()
 
-            # Видаляємо тимчасові файли
             os.remove(docx_path)
             os.remove(pdf_path)
 
@@ -408,10 +475,9 @@ def create_app():
             )
         except Exception as e:
             flash('Не вдалося створити PDF. Встановіть Microsoft Word або скористайтеся DOCX', 'warning')
-            os.remove(docx_path)
+            if os.path.exists(docx_path): os.remove(docx_path)
             return redirect(url_for('my_knowledge'))
 
-        
     return app
 
 if __name__ == '__main__':
