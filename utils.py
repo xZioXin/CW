@@ -7,6 +7,7 @@ from whoosh.qparser import MultifieldParser
 from whoosh.analysis import StemmingAnalyzer
 import shutil
 from datetime import datetime
+from models import db, Document
 
 def get_schema():
     analyzer = StemmingAnalyzer()
@@ -37,18 +38,19 @@ def index_document(doc_id, filepath, index_dir='whoosh_index'):
     ix = open_dir(index_dir)
     writer = ix.writer()
     text = extract_text(filepath)
-    from models import Document
-    doc = Document.query.get(doc_id)
     
-    writer.update_document(
-        id=str(doc_id),
-        title=doc.title,
-        content=text,
-        authors=doc.authors or "",
-        year=str(doc.year) if doc.year else "",
-        path=filepath
-    )
-    writer.commit()
+    doc = db.session.get(Document, doc_id)
+    
+    if doc:
+        writer.update_document(
+            id=str(doc_id),
+            title=doc.title,
+            content=text,
+            authors=doc.authors or "",
+            year=str(doc.year) if doc.year else "",
+            path=filepath
+        )
+        writer.commit()
 
 def delete_document_from_index(doc_id, index_dir='whoosh_index'):
     if exists_in(index_dir):

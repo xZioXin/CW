@@ -62,8 +62,14 @@ def test_extract_text_docx(tmp_path):
 # --- ТЕСТ 4: Перевірка ініціалізації індексу ---
 def test_index_initialization(app_context):
     from utils import init_search_index
-    init_search_index()
     
     index_dir = app_context.config.get('WHOOSH_BASE')
+    
+    init_search_index(index_dir)
+    
     assert os.path.exists(index_dir)
     assert os.path.isdir(index_dir)
+    
+    import shutil
+    if os.path.exists(index_dir):
+        shutil.rmtree(index_dir)
