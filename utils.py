@@ -1,5 +1,5 @@
 import os
-from pypdf import PdfReader  # Нова бібліотека
+from pypdf import PdfReader
 from docx import Document as DocxDocument
 from whoosh.index import create_in, open_dir, exists_in
 from whoosh.fields import Schema, TEXT, ID
@@ -71,7 +71,7 @@ def extract_text(filepath):
     try:
         if ext == '.pdf':
             with open(filepath, 'rb') as f:
-                reader = PdfReader(f) # Використовуємо pypdf
+                reader = PdfReader(f)
                 for page in reader.pages:
                     text += page.extract_text() + "\n"
         elif ext == '.docx':
