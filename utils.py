@@ -1,109 +1,92 @@
 import os
+from pypdf import PdfReader  # Нова бібліотека
+from docx import Document as DocxDocument
+from whoosh.index import create_in, open_dir, exists_in
+from whoosh.fields import Schema, TEXT, ID
+from whoosh.qparser import MultifieldParser
+from whoosh.analysis import StemmingAnalyzer
 import shutil
 from datetime import datetime
-from whoosh.index import create_in, open_dir
-from whoosh.qparser import MultifieldParser, OrGroup
-from whoosh.fields import Schema, TEXT, ID, DATETIME, KEYWORD
-import PyPDF2
-from docx import Document as DocxDocument
-from bleach import clean
-from models import Document
-from flask import current_app
 
-# Описуємо, які поля будемо шукати
 def get_schema():
+    analyzer = StemmingAnalyzer()
     return Schema(
-        doc_id=ID(stored=True, unique=True),
-        title=TEXT(stored=True, phrase=True),
+        id=ID(stored=True, unique=True),
+        title=TEXT(stored=True, analyzer=analyzer),
+        content=TEXT(stored=True, analyzer=analyzer),
         authors=TEXT(stored=True),
-        content=TEXT(stored=True, phrase=True),
-        year=DATETIME(stored=True),
-        tags=KEYWORD(lowercase=True, commas=True)
+        year=ID(stored=True),
+        path=ID(stored=True)
     )
 
-# Створюємо папку для індексу пошуку, якщо її немає
-def init_search_index():
-    if not os.path.exists(current_app.config['WHOOSH_BASE']):
-        os.mkdir(current_app.config['WHOOSH_BASE'])
-        ix = create_in(current_app.config['WHOOSH_BASE'], schema=get_schema())
-        ix.close()
+def init_search_index(index_dir='whoosh_index'):
+    if not os.path.exists(index_dir):
+        os.mkdir(index_dir)
+        create_in(index_dir, get_schema())
+    else:
+        if exists_in(index_dir):
+            try:
+                from whoosh.index import unlock_dir
+                unlock_dir(index_dir)
+            except: pass
 
-# Витягуємо чистий текст із PDF або DOCX
+def index_document(doc_id, filepath, index_dir='whoosh_index'):
+    if not os.path.exists(index_dir):
+        init_search_index(index_dir)
+
+    ix = open_dir(index_dir)
+    writer = ix.writer()
+    text = extract_text(filepath)
+    from models import Document
+    doc = Document.query.get(doc_id)
+    
+    writer.update_document(
+        id=str(doc_id),
+        title=doc.title,
+        content=text,
+        authors=doc.authors or "",
+        year=str(doc.year) if doc.year else "",
+        path=filepath
+    )
+    writer.commit()
+
+def delete_document_from_index(doc_id, index_dir='whoosh_index'):
+    if exists_in(index_dir):
+        ix = open_dir(index_dir)
+        writer = ix.writer()
+        writer.delete_by_term('id', str(doc_id))
+        writer.commit()
+
+def search_fulltext(query_str, index_dir='whoosh_index'):
+    if not exists_in(index_dir): return []
+    ix = open_dir(index_dir)
+    with ix.searcher() as searcher:
+        query = MultifieldParser(["title", "content", "authors"], ix.schema).parse(query_str)
+        results = searcher.search(query, limit=20)
+        return [int(r['id']) for r in results]
+
 def extract_text(filepath):
     text = ""
     ext = os.path.splitext(filepath)[1].lower()
     try:
         if ext == '.pdf':
             with open(filepath, 'rb') as f:
-                reader = PyPDF2.PdfReader(f)
+                reader = PdfReader(f) # Використовуємо pypdf
                 for page in reader.pages:
-                    t = page.extract_text()
-                    if t:
-                        text += t + "\n"
+                    text += page.extract_text() + "\n"
         elif ext == '.docx':
             doc = DocxDocument(filepath)
             for para in doc.paragraphs:
                 text += para.text + "\n"
     except Exception as e:
-        print(f"Помилка читання файлу {filepath}: {e}")
-    
-    # Чистимо текст від зайвих тегів та обмежуємо довжину
-    return clean(text, tags=[], strip=True)[:900000]
+        print(f"Error extracting text: {e}")
+    return text[:900000]
 
-# Додаємо або оновлюємо документ у пошуковому індексі
-def index_document(doc_id, filepath):
-    ix = open_dir(current_app.config['WHOOSH_BASE'])
-    writer = ix.writer()
-
-    doc = Document.query.get(doc_id)
-    content = extract_text(filepath)
-
-    year_dt = None
-    if doc.year:
-        try:
-            year_dt = datetime(doc.year, 1, 1)
-        except:
-            year_dt = None
-
-    writer.update_document(
-        doc_id=str(doc.id),
-        title=doc.title or "",
-        authors=doc.authors or "",
-        content=content,
-        year=year_dt,
-        tags=""
-    )
-    writer.commit()
-
-# Видаляємо документ з пошуку
-def delete_document_from_index(doc_id):
-    if not os.path.exists(current_app.config['WHOOSH_BASE']):
-        return
-    ix = open_dir(current_app.config['WHOOSH_BASE'])
-    writer = ix.writer()
-    writer.delete_by_term('doc_id', str(doc_id))
-    writer.commit()
-
-# Виконуємо пошук по індексу
-def search_fulltext(query_str, limit=100):
-    if not query_str.strip():
-        return []
-    ix = open_dir(current_app.config['WHOOSH_BASE'])
-    with ix.searcher() as searcher:
-        # Шукаємо по назві, вмісту та авторам (АБО там, АБО там)
-        parser = MultifieldParser(["title", "content", "authors"], ix.schema, group=OrGroup)
-        query = parser.parse(query_str)
-        results = searcher.search(query, limit=limit)
-        return [int(r['doc_id']) for r in results]
-
-# Робимо резервну копію бази даних
 def backup_database():
-    backup_dir = "backups"
-    os.makedirs(backup_dir, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    backup_path = os.path.join(backup_dir, f"backup_{timestamp}.db")
-    shutil.copyfile(
-        os.path.join(current_app.instance_path, 'knowledge.db'),
-        backup_path
-    )
-    return backup_path
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    src = 'instance/knowledge.db'
+    dst = f'backups/knowledge_{timestamp}.db'
+    if os.path.exists(src):
+        shutil.copy2(src, dst)
+        return dst
+    return None
